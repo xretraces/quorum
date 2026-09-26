@@ -32,7 +32,7 @@ export function YourPlan({ groupId, plan, me, payments, simulated }: Props) {
       const next = plan.items[i + 1];
       if (next) {
         const leg = legBetween(it, next, mode);
-        lines.push(`   ${leg.label}${leg.from && leg.to && leg.from !== leg.to ? ` ${leg.from} to ${leg.to}` : ""}${leg.detail ? `: ${leg.detail}` : ""}`);
+        lines.push(`   → ${leg.label}${leg.from && leg.to && leg.from !== leg.to ? ` (${leg.from} to ${leg.to})` : ""}${leg.detail ? `. ${leg.detail}` : ""}`);
       }
     });
     if (diet.length) lines.push("", `Diet: ${diet.join(", ")}`, ...dietNotes.map((d) => `- ${d.stop}: ${d.note}`));
@@ -91,7 +91,7 @@ export function YourPlan({ groupId, plan, me, payments, simulated }: Props) {
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Itinerary</h3>
           <span className="text-xs text-gray-500">
-            {MODE[mode].icon} {mode === "unknown" ? "Transport not mentioned" : `You're going by ${MODE[mode].label.toLowerCase()}`}
+            {MODE[mode].icon} {MODE[mode].you}
           </span>
         </div>
         <ol>

@@ -56,12 +56,12 @@ export function parseStart(raw: string) {
 }
 
 export type Mode = "car" | "transit" | "rideshare" | "walk_bike" | "unknown";
-export const MODE: Record<Mode, { icon: string; label: string }> = {
-  car: { icon: "🚗", label: "Drive" },
-  transit: { icon: "🚇", label: "Transit" },
-  rideshare: { icon: "🚕", label: "Rideshare" },
-  walk_bike: { icon: "🚲", label: "Walk or bike" },
-  unknown: { icon: "📍", label: "Getting there" },
+export const MODE: Record<Mode, { icon: string; label: string; you: string }> = {
+  car: { icon: "🚗", label: "Drive", you: "You're driving" },
+  transit: { icon: "🚇", label: "Transit", you: "You're taking transit" },
+  rideshare: { icon: "🚕", label: "Rideshare", you: "You're taking a rideshare" },
+  walk_bike: { icon: "🚲", label: "Walk or bike", you: "You're walking or biking" },
+  unknown: { icon: "📍", label: "Next stop", you: "Transport not mentioned" },
 };
 
 /** Transport from Grok's extraction (members.constraints.transport), else the free-text members.transport. */
