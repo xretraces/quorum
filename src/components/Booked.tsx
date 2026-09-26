@@ -85,7 +85,7 @@ export function Booked({ group, plan, members, payments, simulated, me, onRecap,
               <div className="min-w-0 flex-1">
                 <p className="font-semibold leading-snug text-gray-900">{it.name}</p>
                 <p className="text-xs text-gray-500">
-                  {c?.neighborhood && `${c.neighborhood} · `}Party of {members.length}
+                  {c?.neighborhood && `${c.neighborhood} · `}<span className="whitespace-nowrap">Party of {members.length}</span>
                 </p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
                   <span className="rounded-md bg-gray-900 px-2 py-0.5 font-mono text-xs font-semibold tracking-wider text-white">
