@@ -1,0 +1,12 @@
+{
+ "id": "t2-conflicting-availability",
+ "expect": "Overlap is only Sun 2-5pm (Ana after 2, Ben until 5, Chris 12-6, Dee Sun only); plans must fit that window and typical_hours; no caps except Ben $40",
+ "roster": [
+  "Ana",
+  "Ben",
+  "Chris",
+  "Dee"
+ ],
+ "transcript": "Ana: hang this weekend? I have brunch sunday so only free sunday after 2pm. saturday I'm working all day\nBen: saturday is best for me honestly but I could do sunday until 5, I have a flight at 7\nChris: I'm around sunday 12-6, saturday morning only\nDee: saturday is a no, I have a wedding. sunday any time\nBen: also let's keep it under 40 each, I just paid rent\nChris: museum or something chill? I have a car, can pick up Dee in midtown\nAna: I'll drive from Grant Park\nDee: I'm down for art or history stuff",
+ "fit_possible": true
+}
