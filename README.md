@@ -30,6 +30,7 @@ src/                     React app
   components/            CreateGroup (home: create + join by code), JoinGroup, GroupBoard, GroupChat,
                          PlanCard, RejectButton, LockedPlan (status/booking), PayButton (kit, Stripe)
   lib/supabase.ts        client, invoke() helper, types, money + budget helpers (kit web-snippet + additions)
+  lib/payments.ts        pay-function calls + simulated payments fallback (no Stripe; see "Simulated payments")
   lib/fallback.ts        saved demo plans, used only if the make-plan call fails
 supabase/
   functions/             make-plan, pay, recap-image + _shared (logic, tests, generated catalog/schema/prompt)
@@ -50,6 +51,7 @@ Project ref **`oavxpwpdhdazhtieikju`**. Both migrations are **already applied** 
 - `groups`, `members`, `plans`, `payments`: kit schema, permissive demo RLS, Realtime on. `payments` is read-only for clients.
 - `messages`: live group chat (`sender_name`, `text`, `created_at`), Realtime on.
 - Rejections are stored in `members.constraints.rejection = { plan_id, reason, at }`, so no schema change was needed. `make-plan` overwrites `constraints`, which clears the rejection.
+- Simulated holds (see below) are stored in `members.constraints.sim_payment = { plan_id, status, amount_cents, over_cap_reapproved, reason }`, again no schema change. Nothing is written to `payments`, which stays Stripe-only.
 
 ## How the flow maps to the code
 
@@ -64,6 +66,7 @@ Project ref **`oavxpwpdhdazhtieikju`**. Both migrations are **already applied** 
 | Over-budget user must approve explicitly | `pay` returns `needs_reapproval` → `PayButton` "Approve anyway" |
 | Book & split (test-mode holds), confirmation | Organizer "Lock & collect" → `pay hold`; `PayButton` per member; `pay approve` captures all when everyone is in; `LockedPlan.tsx` |
 | Grok failure | `lib/fallback.ts`: saved plans (recomputed against the real roster) + a visible "demo plan" banner |
+| Stripe not configured / pay failure | `lib/payments.ts`: simulated holds with the same rules + a visible "Simulated payment (test)" badge |
 
 ## Deploy edge functions (Supabase CLI)
 
@@ -81,7 +84,7 @@ npx supabase functions deploy recap-image --no-verify-jwt   # optional
 # No Docker? add --use-api
 ```
 
-`pay` refuses non-test Stripe keys. `SUPABASE_URL` and the service keys are injected automatically; don't set anything that starts with `SUPABASE_`. `--no-verify-jwt` is needed because `sb_publishable_` keys aren't JWTs (also set in `supabase/config.toml`); the functions check for the project's publishable key instead. That check is not auth, which is fine for a demo.
+`pay` refuses non-test Stripe keys. Without `STRIPE_SECRET_KEY` or a deployed `pay`, the app falls back to simulated payments (below). `SUPABASE_URL` and the service keys are injected automatically; don't set anything that starts with `SUPABASE_`. `--no-verify-jwt` is needed because `sb_publishable_` keys aren't JWTs (also set in `supabase/config.toml`); the functions check for the project's publishable key instead. That check is not auth, which is fine for a demo.
 
 Local function checks (Deno 2):
 
@@ -94,7 +97,7 @@ deno test --node-modules-dir=none supabase/functions/_shared/logic.test.ts
 
 ## Deploy web (Vercel)
 
-Import the repo → framework **Vite** → add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` → Deploy. `vercel.json` rewrites everything to `index.html`, so `/join/<code>` and `/g/<id>` deep links work.
+Import the repo → framework **Vite** → add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (optionally `VITE_SIMULATE_PAYMENTS=true` for a rehearsal deploy) → Deploy. `vercel.json` rewrites everything to `index.html`, so `/join/<code>` and `/g/<id>` deep links work.
 
 ## Branch workflow (3 people)
 
@@ -136,6 +139,19 @@ GROK_API_KEY=xai-... python3 run.py
 
 Any future expiry, any CVC, any ZIP. Holds show as **Uncaptured** in Stripe Dashboard (test mode) → Payments.
 
+## Simulated payments (demo-safe fallback)
+
+Like the saved demo plan for Grok, "Lock & collect" has a fallback that needs no Stripe at all. It walks the same steps: each member places a hold capped at their budget, an over-cap member must tap "Approve anyway" first, the last approval captures everything, and "Cancel group" releases every hold. It uses the `pay` function's own rules (`decideHold`, `approvalCovers`, `captureReadiness` imported from `supabase/functions/_shared/logic.ts`). The card form becomes a single **Hold $X (simulated)** button, and the locked plan and confirmation show a **Simulated payment (test)** badge with the reason. No card is charged and nothing is sent to Stripe.
+
+| Mode | How to get it |
+| --- | --- |
+| **Real Stripe** (default when configured) | `VITE_STRIPE_PUBLISHABLE_KEY=pk_test_…` (a real key), `pay` deployed, `STRIPE_SECRET_KEY` set, `VITE_SIMULATE_PAYMENTS` unset or `false` |
+| **Forced simulation** (rehearsals) | `VITE_SIMULATE_PAYMENTS=true` in `.env.local` (or Vercel env), then restart `npm run dev` / redeploy. Badge reason: "Rehearsal mode" |
+| **Auto: Stripe not configured** | `VITE_STRIPE_PUBLISHABLE_KEY` missing or still the `pk_test_...` placeholder: simulates without calling `pay`. If the key is fine but `pay` isn't deployed or has no `STRIPE_SECRET_KEY`, the lock call fails and the group switches to simulated |
+| **Auto: Stripe call fails** | Any pay call that fails for infrastructure reasons (network, 5xx, Stripe API error, 401) switches the group to simulated and shows an amber notice with the error. Business-rule errors (400/404/409 such as "Group is cancelled") and card declines in the Stripe form are shown as before |
+
+How it syncs: simulated state lives in `members.constraints.sim_payment` plus the usual `members.approved*` and `groups.status` columns, so every phone follows along over the existing Realtime subscriptions. A group counts as simulated once any member has a `sim_payment` for the locked plan, so every phone in that group uses the simulated path whatever its own env says. If Stripe fails in the middle of a real flow, approvals are kept, holds that were already authorized carry over as placed, and the real test-mode holds are never captured (Stripe releases uncaptured test authorizations on its own). Generating new plans clears the simulated holds, the same way it clears rejections.
+
 ## Demo script (2–3 min)
 
 **0:00, the hook (Meta: human connection).** "Every group chat has this: 40 messages, no plan, and one friend quietly can't afford the idea everyone's excited about. Quorum turns the chat into a plan that works for *everyone*, and nobody has to front the money."
@@ -152,7 +168,7 @@ Any future expiry, any CVC, any ZIP. Holds show as **Uncaptured** in Stripe Dash
 
 Judging hooks. **Meta:** real-world connection, with AI synthesizing the group discussion. **Visa:** GenAI from discovery to decision to budget personalization to secure checkout, with manual capture as the consent layer. **SpaceXAI:** Grok structured outputs, Grok Imagine, voice (upgrade to Grok Voice), and built with Cursor. The frame is *financial inclusion in social life*.
 
-**If Grok is down on stage:** Generate Plan falls back to saved plans for this exact conversation and shows a "saved demo plan" banner. Payments still need the deployed `pay` function and a Stripe test key.
+**If Grok is down on stage:** Generate Plan falls back to saved plans for this exact conversation and shows a "saved demo plan" banner. **If Stripe is down or not set up:** Lock & collect falls back to simulated holds with a "Simulated payment (test)" badge (see "Simulated payments"). To rehearse without Stripe, set `VITE_SIMULATE_PAYMENTS=true`.
 
 ## Security notes (demo)
 
