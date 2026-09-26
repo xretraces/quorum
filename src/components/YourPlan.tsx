@@ -5,6 +5,7 @@ import {
   bookingRef, dietNotesFor, dietOf, holdOf, legBetween, MODE, parseStart, payState, transportOf,
 } from "../lib/booking";
 import { type Member, type Payment, type Plan, type SimReason, usd } from "../lib/supabase";
+import { DemoPlanPill, GrokSays } from "./Grok";
 
 type Props = { groupId: string; plan: Plan; me: Member; payments: Payment[]; simulated: SimReason | null };
 
@@ -157,9 +158,9 @@ export function YourPlan({ groupId, plan, me, payments, simulated }: Props) {
       )}
 
       {grokNote && (
-        <p className="rounded-xl bg-indigo-50 p-3 text-sm text-indigo-900">
-          <span className="font-semibold">✨ Why it works for you:</span> {grokNote}
-        </p>
+        <GrokSays label="why it works for you" tag={plan.model === "demo-fallback" && <DemoPlanPill />} className="rounded-xl bg-indigo-50 p-3">
+          {grokNote}
+        </GrokSays>
       )}
 
       <button

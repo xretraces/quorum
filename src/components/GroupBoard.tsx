@@ -7,6 +7,7 @@ import { buildFallbackPlans } from "../lib/fallback";
 import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
 import { cancelGroup, type Fallback, lockPlan, SIM_REASON_TEXT, simReasonOf, stripeUnavailable } from "../lib/payments";
 import { Booked } from "./Booked";
+import { DemoPlanPill } from "./Grok";
 import { GrokWorking } from "./GrokWorking";
 import { GroupChat } from "./GroupChat";
 import { LockedPlan } from "./LockedPlan";
@@ -310,14 +311,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
           <section className="space-y-4">
             <div className="flex items-center gap-2 px-1">
               <h2 className="font-semibold text-gray-900">Approve or reject a plan</h2>
-              {demoPlans && (
-                <span
-                  title="Grok didn't answer, so these are saved plans for this chat. Budgets are still checked."
-                  className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
-                >
-                  Demo plan
-                </span>
-              )}
+              {demoPlans && <DemoPlanPill />}
             </div>
             {plans.map((p) => (
               <PlanCard key={p.id} plan={p} members={members} me={me} onVote={() => vote(p.id)} onLock={() => lock(p.id)} busy={!!busy} />

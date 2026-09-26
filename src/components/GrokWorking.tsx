@@ -2,6 +2,7 @@
 // the shared start time; when the response arrives the remaining steps tick off quickly, then onDone hides it.
 import { useEffect, useRef, useState } from "react";
 import type { GrokRun } from "../lib/grokRun";
+import { DemoPlanPill, GrokAvatar, GrokSays } from "./Grok";
 
 const STEPS = [
   "Reading the chat",
@@ -9,6 +10,13 @@ const STEPS = [
   "Checking each budget",
   "Planning travel between stops",
   "Picking the best 2–3 plans",
+];
+const SAYS = [
+  "is reading the chat",
+  "is finding places that fit everyone",
+  "is checking each budget",
+  "is planning travel between stops",
+  "is picking the best 2–3 plans",
 ];
 /** Seconds after the start at which each step becomes active. The last one stays active until the response. */
 const STEP_AT_S = [0, 5, 14, 26, 40];
@@ -51,17 +59,21 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
 
   return (
     <section ref={ref} aria-live="polite" className="space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 shadow-md">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold uppercase tracking-wide text-indigo-600">✨ Grok</span>
+      <div className="flex items-center gap-2.5">
+        <GrokAvatar size={32} />
+        <div className="min-w-0 flex-1 leading-tight">
+          <p className="text-sm font-bold text-gray-900">Grok</p>
+          <p className="text-xs text-gray-500">Your group's planner</p>
+        </div>
         <span className="font-mono text-xs tabular-nums text-indigo-400">{clock}</span>
       </div>
 
       <p className="text-lg text-gray-900">
         {allDone ? (
-          <span className="font-semibold">{demo ? "Demo plans are ready" : "Plans are ready"}</span>
+          <span className="font-semibold">{demo ? "Demo plans are ready" : "Grok's plans are ready"}</span>
         ) : (
-          <span className="shimmer-text">
-            <b>Grok</b> is putting together plans…
+          <span key={doneCount} className="shimmer-text">
+            <b>Grok</b> {SAYS[Math.min(doneCount, SAYS.length - 1)]}…
           </span>
         )}
       </p>
@@ -107,11 +119,12 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
             : "Usually takes about a minute. Everyone in the group sees this."}
         </p>
       )}
-      {allDone && demo && (
-        <p className="text-xs text-gray-600">
-          <span className="mr-1.5 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Demo plan</span>
-          Grok didn't answer this time, so these are saved plans for this chat. Budgets are still checked against everyone's cap.
-        </p>
+      {allDone && (
+        <GrokSays tag={demo && <DemoPlanPill />}>
+          {demo
+            ? "I didn't get an answer back this time, so these are saved plans for this chat. Budgets are still checked against everyone's cap."
+            : "Scroll down to approve or reject. Everyone votes from their own phone."}
+        </GrokSays>
       )}
     </section>
   );

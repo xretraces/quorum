@@ -1,5 +1,6 @@
 // One plan option: items, estimated per-person cost, budget check per member, votes, reject.
 import { type Member, overCapBy, type Plan, rejectionOf, usd } from "../lib/supabase";
+import { GrokSays } from "./Grok";
 import { RejectButton } from "./RejectButton";
 
 type Props = {
@@ -43,7 +44,11 @@ export function PlanCard({ plan, members, me, onVote, onLock, busy }: Props) {
       </ol>
       <p className="text-xs text-gray-400">Estimated total {usd(plan.total_cents)} · prices are approximate demo data</p>
 
-      {plan.why_it_works && <p className="text-sm italic text-gray-600">"{plan.why_it_works}"</p>}
+      {plan.why_it_works && (
+        <GrokSays label="why this works" className="rounded-xl bg-indigo-50 p-3">
+          {plan.why_it_works}
+        </GrokSays>
+      )}
 
       <div className="border-t border-gray-100 pt-3">
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Budget check</p>
