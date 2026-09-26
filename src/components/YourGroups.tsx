@@ -1,7 +1,7 @@
 // "Your groups" on the home screen: every group this device created or joined, newest activity first.
 // One PostgREST query returns each group with its member count and latest message; Realtime keeps it fresh.
 import { useCallback, useEffect, useState } from "react";
-import { forgetGroup, myGroupIds, supabase } from "../lib/supabase";
+import { forgetGroup, myGroupIds, statusBadge, supabase } from "../lib/supabase";
 
 type Row = {
   id: string; name: string; status: string; created_at: string;
@@ -10,15 +10,6 @@ type Row = {
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-const STATUS: Record<string, { label: string; cls: string }> = {
-  planning: { label: "Chatting", cls: "bg-sky-100 text-sky-700" },
-  voting: { label: "Voting", cls: "bg-amber-100 text-amber-700" },
-  holding: { label: "Locked", cls: "bg-indigo-100 text-indigo-700" },
-  captured: { label: "Booked", cls: "bg-emerald-100 text-emerald-700" },
-  partially_captured: { label: "Partly booked", cls: "bg-emerald-100 text-emerald-700" },
-  cancelled: { label: "Cancelled", cls: "bg-gray-100 text-gray-600" },
-};
 
 const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto", style: "short" });
 function ago(iso: string) {
@@ -98,7 +89,7 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
       ) : (
         <ul className="divide-y divide-gray-100">
           {groups.map((g) => {
-            const s = STATUS[g.status] ?? { label: g.status, cls: "bg-gray-100 text-gray-600" };
+            const s = statusBadge(g.status);
             const last = g.messages[0];
             const count = g.members[0]?.count ?? 0;
             return (

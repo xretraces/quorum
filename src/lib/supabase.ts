@@ -32,6 +32,17 @@ export const myGroupIds = () =>
   Object.keys(localStorage).filter((k) => k.startsWith(MEMBER_KEY)).map((k) => k.slice(MEMBER_KEY.length));
 export const forgetGroup = (groupId: string) => localStorage.removeItem(`${MEMBER_KEY}${groupId}`);
 
+const STATUS: Record<string, { label: string; cls: string }> = {
+  planning: { label: "Chatting", cls: "bg-sky-100 text-sky-700" },
+  voting: { label: "Voting", cls: "bg-amber-100 text-amber-700" },
+  holding: { label: "Locked", cls: "bg-indigo-100 text-indigo-700" },
+  captured: { label: "Booked", cls: "bg-emerald-100 text-emerald-700" },
+  partially_captured: { label: "Partly booked", cls: "bg-emerald-100 text-emerald-700" },
+  cancelled: { label: "Cancelled", cls: "bg-gray-100 text-gray-600" },
+};
+/** User-facing label + Tailwind colors for groups.status. */
+export const statusBadge = (status: string) => STATUS[status] ?? { label: status, cls: "bg-gray-100 text-gray-600" };
+
 export const usd = (cents: number | null | undefined) =>
   cents === null || cents === undefined ? "n/a" : `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 

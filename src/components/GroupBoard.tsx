@@ -1,7 +1,7 @@
 // Group board: members, live chat, Generate Plan (Grok via make-plan), plan cards with live approve/reject,
 // then the locked plan with PayButton holds and the status screen. Everything refetches on Realtime changes.
 import { useCallback, useEffect, useState } from "react";
-import { type Group, invoke, type Member, myMemberId, type Payment, type Plan, rejectionOf, supabase, usd } from "../lib/supabase";
+import { type Group, invoke, type Member, myMemberId, type Payment, type Plan, rejectionOf, statusBadge, supabase, usd } from "../lib/supabase";
 import { buildFallbackPlans } from "../lib/fallback";
 import { GroupChat } from "./GroupChat";
 import { LockedPlan } from "./LockedPlan";
@@ -172,7 +172,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             <a href="/" onClick={home} className="text-xs font-bold uppercase tracking-wide text-indigo-600">Quorum · Your groups</a>
             <h1 className="truncate text-2xl font-bold text-gray-900">{group.name}</h1>
           </div>
-          <span className="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">{group.status}</span>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${statusBadge(group.status).cls}`}>{statusBadge(group.status).label}</span>
         </header>
 
         {!me && (
