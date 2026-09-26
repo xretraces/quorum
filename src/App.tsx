@@ -27,11 +27,11 @@ export default function App() {
   return (
     <>
       {board ? (
-        <GroupBoard groupId={board[1]} />
+        <GroupBoard groupId={board[1]} onHome={() => go("/")} />
       ) : join ? (
         <JoinGroup inviteCode={join[1]} onJoined={toGroup} />
       ) : (
-        <CreateGroup onCreated={toGroup} onJoinCode={(c) => go(`/join/${encodeURIComponent(c)}`)} />
+        <CreateGroup onCreated={toGroup} onOpen={toGroup} onJoinCode={(c) => go(`/join/${encodeURIComponent(c)}`)} />
       )}
     </>
   );

@@ -2,10 +2,13 @@
 // or a friend enters an invite code and goes to /join/:code.
 import { useState } from "react";
 import { dollarsToCents, INVALID_BUDGET, setMyMemberId, supabase } from "../lib/supabase";
+import { YourGroups } from "./YourGroups";
 
 const input = "w-full rounded-lg border border-gray-300 p-3 focus:border-transparent focus:ring-2 focus:ring-indigo-500";
 
-export function CreateGroup({ onCreated, onJoinCode }: { onCreated: (groupId: string) => void; onJoinCode: (code: string) => void }) {
+type Props = { onCreated: (groupId: string) => void; onJoinCode: (code: string) => void; onOpen: (groupId: string) => void };
+
+export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
   const [groupName, setGroupName] = useState("Saturday hang");
   const [name, setName] = useState("");
   const [cap, setCap] = useState("30");
@@ -51,6 +54,8 @@ export function CreateGroup({ onCreated, onJoinCode }: { onCreated: (groupId: st
           <h1 className="text-4xl font-bold text-indigo-600">Quorum</h1>
           <p className="mt-2 text-gray-600">Turn group-chat chaos into a plan everyone agrees on.</p>
         </div>
+
+        <YourGroups onOpen={onOpen} />
 
         <form onSubmit={create} className="space-y-3 rounded-2xl bg-white p-6 shadow-lg">
           <h2 className="text-xl font-bold">Create Group</h2>
