@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/plan-and-pay/plan.schema.json",
+  "title": "PlanAndPayResult",
+  "description": "Strict output of the make-plan Grok call. The make-plan function injects the live catalog ids as an enum on plans[].items[].catalog_id at runtime and strips $schema/$id before sending. Money is always integer USD cents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["members", "constraints", "plans", "reasoning"],
+  "properties": {
+    "members": {
+      "type": "array",
+      "description": "One entry per group member mentioned in the chat or present in the roster.",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["member_id", "name", "budget_cap_cents", "dietary", "availability", "location", "transport", "notes"],
+        "properties": {
+          "member_id": { "type": ["string", "null"], "description": "Roster id if the person matches a roster entry, else null." },
+          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "budget_cap_cents": { "type": ["integer", "null"], "minimum": 0, "description": "Max this person will spend per person, in USD cents. Null if never stated." },
+          "dietary": { "type": "array", "items": { "type": "string", "maxLength": 60 }, "maxItems": 10, "description": "e.g. vegetarian, vegan, halal, gluten-free, no pork. Empty if none." },
+          "availability": { "type": "string", "maxLength": 200, "description": "Free text window, e.g. 'Sat after 2pm'. Empty string if unknown." },
+          "location": { "type": "string", "maxLength": 120, "description": "Neighborhood/area they start from. Empty string if unknown." },
+          "transport": { "type": "string", "enum": ["car", "transit", "rideshare", "walk_bike", "unknown"] },
+          "notes": { "type": "string", "maxLength": 300 }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "description": "Group-level constraints derived from all members.",
+      "additionalProperties": false,
+      "required": ["party_size", "max_per_person_cents", "dietary_union", "needs_transit", "time_window", "hard_constraints", "soft_preferences"],
+      "properties": {
+        "party_size": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "max_per_person_cents": { "type": ["integer", "null"], "minimum": 0, "description": "The LOWEST known member cap (the binding constraint). Null if no caps known." },
+        "dietary_union": { "type": "array", "items": { "type": "string", "maxLength": 60 }, "maxItems": 20 },
+        "needs_transit": { "type": "boolean", "description": "True if any member has no car." },
+        "time_window": { "type": "string", "maxLength": 200, "description": "Overlap of everyone's availability. Empty string if unknown." },
+        "hard_constraints": { "type": "array", "items": { "type": "string", "maxLength": 200 }, "maxItems": 20 },
+        "soft_preferences": { "type": "array", "items": { "type": "string", "maxLength": 200 }, "maxItems": 20 }
+      }
+    },
+    "plans": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "summary", "items", "total_cents", "per_person_cents", "fits_everyone", "over_cap_member_names", "member_notes", "why_it_works"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "summary": { "type": "string", "maxLength": 400 },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["catalog_id", "start_time", "note"],
+              "properties": {
+                "catalog_id": { "type": "string", "pattern": "[a-z0-9-]+", "description": "MUST be an id from the provided catalog (enum injected at runtime)." },
+                "start_time": { "type": "string", "maxLength": 40, "description": "e.g. 'Sat 2:00 PM'" },
+                "note": { "type": "string", "maxLength": 200 }
+              }
+            }
+          },
+          "total_cents": { "type": "integer", "minimum": 0, "description": "per_person_cents * party_size" },
+          "per_person_cents": { "type": "integer", "minimum": 0, "description": "Sum of items' price_per_person_cents from the catalog." },
+          "fits_everyone": { "type": "boolean", "description": "True only if per_person_cents <= every known member cap AND dietary/transit/availability constraints are satisfied." },
+          "over_cap_member_names": { "type": "array", "items": { "type": "string" }, "maxItems": 20, "description": "Members whose cap is exceeded. Must be empty unless the plan is explicitly flagged (fits_everyone=false)." },
+          "member_notes": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["member_id", "name", "note", "within_budget"],
+              "properties": {
+                "member_id": { "type": ["string", "null"] },
+                "name": { "type": "string", "maxLength": 80 },
+                "note": { "type": "string", "maxLength": 240, "description": "Why this plan works (or doesn't) for this person." },
+                "within_budget": { "type": "boolean" }
+              }
+            }
+          },
+          "why_it_works": { "type": "string", "maxLength": 600, "description": "Short 'why it works for everyone' pitch shown to the group." }
+        }
+      }
+    },
+    "reasoning": { "type": "string", "maxLength": 1200, "description": "Brief, user-facing explanation of trade-offs. No hidden chain-of-thought needed." }
+  }
+}

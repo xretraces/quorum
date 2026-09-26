@@ -1,0 +1,12 @@
+{
+ "id": "t3-cap-cannot-fit",
+ "expect": "Group insists on a sit-down meal; Marcus cap $10 < cheapest food (1500) -> every meal plan must flag Marcus (fits_everyone=false, over_cap_member_names=[Marcus], within_budget=false); may offer a free no-meal option; no private invented discounts",
+ "roster": [
+  "Tasha",
+  "Marcus",
+  "Elena",
+  "Kofi"
+ ],
+ "transcript": "Tasha: birthday dinner for Kofi saturday night!! it has to include a real meal, it's his birthday\nKofi: 🥹 yes food is mandatory. I'm thinking southern food or bbq, budget's not a big deal for me, like $60\nElena: I'm in, up to $45, free after 5pm, I have a car\nMarcus: love you guys but I literally have $10 until payday, I can't go over that. I can still come hang\nTasha: I'll be there from 6, $50 is fine\nKofi: we're all driving from Midtown\nElena: I don't eat pork btw",
+ "fit_possible": false
+}

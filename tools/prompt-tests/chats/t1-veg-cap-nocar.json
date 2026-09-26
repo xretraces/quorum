@@ -1,0 +1,13 @@
+{
+ "id": "t1-veg-cap-nocar",
+ "expect": "Priya vegetarian -> all food veg_friendly; Jordan cap $25 -> >=1 plan <=2500 pp, others flagged; Sam no car -> transit_friendly or ride noted",
+ "roster": [
+  "Priya",
+  "Jordan",
+  "Sam",
+  "Leo"
+ ],
+ "transcript": "Priya: ok are we doing something saturday?? I'm free all afternoon\nJordan: yes but I'm broke lol, $25 max for me total pls\nSam: down! heads up I don't have my car this weekend, I'll be on MARTA from Decatur\nLeo: I can drive 3 people if needed. saturday 1-7 works\nPriya: reminder I'm vegetarian 🌱 so somewhere with real veggie options not just fries\nJordan: something outdoors would be sick if the weather's nice\nLeo: I'd do up to like 40 bucks\nSam: same-ish, $35 is my limit\nPriya: I'm flexible, under $50",
+ "fit_possible": true,
+ "expect_needs_transit": true
+}

@@ -1,0 +1,12 @@
+# Minimal Supabase CLI config. Remote project ref: oavxpwpdhdazhtieikju (`supabase link --project-ref ...`).
+project_id = "quorum"
+
+# sb_publishable_ keys are not JWTs, so the platform JWT check is off; the functions do their own key check (_shared/http.ts).
+[functions.make-plan]
+verify_jwt = false
+
+[functions.pay]
+verify_jwt = false
+
+[functions.recap-image]
+verify_jwt = false
