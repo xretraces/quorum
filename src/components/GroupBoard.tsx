@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { type Group, invoke, type Member, myMemberId, type Payment, type Plan, rejectionOf, statusBadge, supabase, usd } from "../lib/supabase";
 import { buildFallbackPlans } from "../lib/fallback";
+import { cancelGroup, type Fallback, lockPlan, SIM_REASON_TEXT, simReasonOf, stripeUnavailable } from "../lib/payments";
 import { GroupChat } from "./GroupChat";
 import { LockedPlan } from "./LockedPlan";
 import { PlanCard } from "./PlanCard";
@@ -75,8 +76,22 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       if (error) throw error;
     });
 
-  const lock = (planId: string) => run("lock", () => invoke("pay", { action: "hold", group_id: groupId, plan_id: planId }));
-  const cancel = () => run("cancel", () => invoke("pay", { action: "cancel", group_id: groupId }));
+  const locked = plans.find((p) => p.id === group?.selected_plan_id);
+  const simulated = locked ? simReasonOf(members, locked.id) : null;
+
+  const onFallback = (f: Fallback) =>
+    setInfo(`Stripe is unavailable right now (${f.message}). ${SIM_REASON_TEXT[f.reason]} Everyone continues with simulated payments (test).`);
+  const lock = (planId: string) =>
+    run("lock", async () => {
+      setInfo(null);
+      const f = await lockPlan(groupId, planId);
+      if (f) onFallback(f);
+    });
+  const cancel = () =>
+    run("cancel", async () => {
+      const note = await cancelGroup(groupId, simulated !== null);
+      if (note) setInfo(note);
+    });
   const recap = () => run("recap", () => invoke("recap-image", { group_id: groupId }));
 
   const planIds = plans.map((p) => p.id);
@@ -98,7 +113,11 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     setErr(null);
     setInfo(null);
     try {
-      if (liveHolds) await invoke("pay", { action: "cancel", group_id: groupId }); // make-plan refuses while holds are live
+      if (liveHolds) { // make-plan refuses while holds are live
+        await invoke("pay", { action: "cancel", group_id: groupId }).catch((e) => {
+          if (!stripeUnavailable(e)) throw e; // pay is down: make-plan will refuse and the saved demo plan takes over
+        });
+      }
       try {
         await invoke("make-plan", { group_id: groupId, transcript: base + capRule, hard_cap: hardCap });
       } catch (e) {
@@ -139,7 +158,6 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     rec.start();
   }
 
-  const locked = plans.find((p) => p.id === group?.selected_plan_id);
   const home = (e: React.MouseEvent) => {
     e.preventDefault();
     onHome();
@@ -277,11 +295,13 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             plan={locked}
             members={members}
             payments={payments}
+            simulated={simulated}
             me={me}
             rejected={rejections.length > 0}
             onRefresh={load}
             onCancel={cancel}
             onRecap={recap}
+            onFallback={onFallback}
             busy={!!busy}
           />
         )}
