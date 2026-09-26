@@ -1,9 +1,13 @@
-// Group board: members, live chat, Generate Plan (Grok via make-plan), plan cards with live approve/reject,
-// then the locked plan with PayButton holds and the status screen. Everything refetches on Realtime changes.
+// Group board: members, live chat, Generate Plan (Grok via make-plan) with the shared "Grok is working" steps,
+// plan cards with live approve/reject, the locked plan with PayButton holds, then the Booked screen once
+// everything is captured. Everything refetches on Realtime changes.
 import { useCallback, useEffect, useState } from "react";
 import { type Group, invoke, type Member, myMemberId, type Payment, type Plan, rejectionOf, statusBadge, supabase, usd } from "../lib/supabase";
 import { buildFallbackPlans } from "../lib/fallback";
+import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
 import { cancelGroup, type Fallback, lockPlan, SIM_REASON_TEXT, simReasonOf, stripeUnavailable } from "../lib/payments";
+import { Booked } from "./Booked";
+import { GrokWorking } from "./GrokWorking";
 import { GroupChat } from "./GroupChat";
 import { LockedPlan } from "./LockedPlan";
 import { PlanCard } from "./PlanCard";
@@ -21,8 +25,13 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [myRun, setMyRun] = useState<GrokRun | null>(null);
+  const [dismissedRun, setDismissedRun] = useState<number | null>(null);
+  const { remote: remoteRun, announce } = useGrokRun(groupId);
   const meId = myMemberId(groupId);
   const me = members.find((m) => m.id === meId);
+  const grokRun = [myRun, remoteRun].find((r) => r && r.startedAt !== dismissedRun) ?? null;
+  const dismissGrokRun = useCallback(() => setDismissedRun(grokRun?.startedAt ?? null), [grokRun?.startedAt]);
 
   const load = useCallback(async () => {
     const [g, m, p, pay] = await Promise.all([
@@ -77,6 +86,8 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     });
 
   const locked = plans.find((p) => p.id === group?.selected_plan_id);
+  const booked = !!locked && (group?.status === "captured" || group?.status === "partially_captured");
+  const demoPlans = plans.some((p) => p.model === "demo-fallback");
   const simulated = locked ? simReasonOf(members, locked.id) : null;
 
   const onFallback = (f: Fallback) =>
@@ -112,6 +123,14 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     setBusy("grok");
     setErr(null);
     setInfo(null);
+    const run: GrokRun = { startedAt: Date.now(), finishedAt: null, outcome: "working", by: me?.display_name ?? "The organizer" };
+    const finishRun = (outcome: GrokOutcome | null) => {
+      const next = outcome ? { ...run, finishedAt: Date.now(), outcome } : null;
+      setMyRun(next);
+      announce(next);
+    };
+    setMyRun(run);
+    announce(run);
     try {
       if (liveHolds) { // make-plan refuses while holds are live
         await invoke("pay", { action: "cancel", group_id: groupId }).catch((e) => {
@@ -120,13 +139,16 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       }
       try {
         await invoke("make-plan", { group_id: groupId, transcript: base + capRule, hard_cap: hardCap });
+        finishRun("grok");
       } catch (e) {
         console.error("make-plan failed, using saved demo plan", e);
         await applyFallback(hardCap);
+        finishRun("demo");
         setInfo(`Grok is unavailable right now (${e instanceof Error ? e.message : String(e)}). Showing a saved demo plan instead.`);
       }
       await load();
     } catch (e) {
+      finishRun(null);
       setErr(`We couldn't generate a plan right now. ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
@@ -199,30 +221,32 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
           </p>
         )}
 
-        <section className="rounded-2xl bg-white p-4 shadow-md">
-          <h2 className="mb-2 font-semibold text-gray-900">Who's in ({members.length})</h2>
-          {!locked && (
-            <div className="mb-3 rounded-lg bg-gray-50 p-2">
-              <p className="text-xs text-gray-600">
-                Group code <b className="font-mono">{group.invite_code}</b> · share this link:
-              </p>
-              <div className="mt-1 flex items-center gap-2">
-                <code className="flex-1 truncate rounded border bg-white px-2 py-1 text-xs">{inviteUrl}</code>
-                <button onClick={() => navigator.clipboard.writeText(inviteUrl)} className="text-xs font-medium text-indigo-600">Copy</button>
+        {!booked && (
+          <section className="rounded-2xl bg-white p-4 shadow-md">
+            <h2 className="mb-2 font-semibold text-gray-900">Who's in ({members.length})</h2>
+            {!locked && (
+              <div className="mb-3 rounded-lg bg-gray-50 p-2">
+                <p className="text-xs text-gray-600">
+                  Group code <b className="font-mono">{group.invite_code}</b> · share this link:
+                </p>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="flex-1 truncate rounded border bg-white px-2 py-1 text-xs">{inviteUrl}</code>
+                  <button onClick={() => navigator.clipboard.writeText(inviteUrl)} className="text-xs font-medium text-indigo-600">Copy</button>
+                </div>
               </div>
-            </div>
-          )}
-          <ul className="flex flex-wrap gap-2">
-            {members.map((m) => (
-              <li key={m.id} className="rounded-full bg-indigo-50 px-3 py-1.5 text-sm text-indigo-800">
-                {m.display_name}
-                {m.is_organizer && " 👑"}
-                <span className="text-indigo-600"> · {usd(m.budget_cap_cents)}</span>
-                {m.dietary && <span className="text-indigo-500"> · {m.dietary}</span>}
-              </li>
-            ))}
-          </ul>
-        </section>
+            )}
+            <ul className="flex flex-wrap gap-2">
+              {members.map((m) => (
+                <li key={m.id} className="rounded-full bg-indigo-50 px-3 py-1.5 text-sm text-indigo-800">
+                  {m.display_name}
+                  {m.is_organizer && " 👑"}
+                  <span className="text-indigo-600"> · {usd(m.budget_cap_cents)}</span>
+                  {m.dietary && <span className="text-indigo-500"> · {m.dietary}</span>}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {rejections.length > 0 && (
           <section className="space-y-2 rounded-2xl border-2 border-red-200 bg-red-50 p-4">
@@ -253,7 +277,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
           </section>
         )}
 
-        {me?.is_organizer && !locked && (
+        {me?.is_organizer && !locked && !grokRun && (
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-md">
             <h2 className="font-semibold text-gray-900">Generate Plan</h2>
             <p className="text-sm text-gray-600">
@@ -280,16 +304,32 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
           </section>
         )}
 
-        {!locked && plans.length > 0 && (
+        {grokRun && <GrokWorking key={grokRun.startedAt} run={grokRun} isMine={grokRun === myRun} onDone={dismissGrokRun} />}
+
+        {!locked && !grokRun && plans.length > 0 && (
           <section className="space-y-4">
-            <h2 className="px-1 font-semibold text-gray-900">Approve or reject a plan</h2>
+            <div className="flex items-center gap-2 px-1">
+              <h2 className="font-semibold text-gray-900">Approve or reject a plan</h2>
+              {demoPlans && (
+                <span
+                  title="Grok didn't answer, so these are saved plans for this chat. Budgets are still checked."
+                  className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
+                >
+                  Demo plan
+                </span>
+              )}
+            </div>
             {plans.map((p) => (
               <PlanCard key={p.id} plan={p} members={members} me={me} onVote={() => vote(p.id)} onLock={() => lock(p.id)} busy={!!busy} />
             ))}
           </section>
         )}
 
-        {locked && (
+        {booked && (
+          <Booked group={group} plan={locked} members={members} payments={payments} simulated={simulated} me={me} onRecap={recap} busy={!!busy} />
+        )}
+
+        {locked && !booked && (
           <LockedPlan
             group={group}
             plan={locked}
@@ -300,7 +340,6 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             rejected={rejections.length > 0}
             onRefresh={load}
             onCancel={cancel}
-            onRecap={recap}
             onFallback={onFallback}
             busy={!!busy}
           />

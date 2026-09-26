@@ -111,5 +111,7 @@ export type Plan = {
   per_person_cents: number; total_cents: number; fits_everyone: boolean; over_cap_member_ids: string[];
   member_notes: { member_id: string | null; name: string; note: string; within_budget: boolean }[];
   why_it_works: string | null; reasoning: string | null; server_warnings: string[];
+  /** Grok model id, or "demo-fallback" for the saved demo plans (lib/fallback.ts). */
+  model?: string | null;
 };
 export type Payment = { id: string; member_id: string; plan_id: string; amount_cents: number; status: string; over_cap_reapproved: boolean };
