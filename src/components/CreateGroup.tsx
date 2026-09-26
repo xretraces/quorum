@@ -52,7 +52,7 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
       <div className="w-full max-w-md space-y-4">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-indigo-600">Quorum</h1>
-          <p className="mt-2 text-gray-600">Turn group-chat chaos into a plan everyone agrees on.</p>
+          <p className="mt-2 text-gray-600">Turn messy group chats into a plan everyone can pay for.</p>
         </div>
 
         <YourGroups onOpen={onOpen} />

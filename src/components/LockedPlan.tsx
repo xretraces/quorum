@@ -1,7 +1,9 @@
-// Locked plan + status screen: per-member approval/hold status, my PayButton (kit), reject, and the
-// "Booking confirmed" view once the pay function has captured every hold.
+// Locked plan + status screen: per-member approval/hold status, my PayButton (kit), reject. Once every hold is
+// captured, GroupBoard shows Booked instead.
+import { holdOf } from "../lib/booking";
 import { type Fallback, SIM_REASON_TEXT, simPaymentOf } from "../lib/payments";
 import { type Group, type Member, overCapBy, type Payment, type Plan, rejectionOf, type SimReason, usd } from "../lib/supabase";
+import { CardLabel } from "./CardLabel";
 import { PayButton } from "./PayButton";
 import { RejectButton } from "./RejectButton";
 
@@ -15,7 +17,6 @@ type Props = {
   rejected: boolean;
   onRefresh: () => void;
   onCancel: () => void;
-  onRecap: () => void;
   onFallback: (f: Fallback) => void;
   busy: boolean;
 };
@@ -29,38 +30,27 @@ function statusOf(m: Member, plan: Plan, holdStatus: string | undefined) {
   return { icon: "⏳", label: "Pending", cls: "bg-gray-100 text-gray-600" };
 }
 
-export function LockedPlan({ group, plan, members, payments, simulated, me, rejected, onRefresh, onCancel, onRecap, onFallback, busy }: Props) {
+export function LockedPlan({ group, plan, members, payments, simulated, me, rejected, onRefresh, onCancel, onFallback, busy }: Props) {
   const holdStatusOf = (m: Member) =>
     simulated ? simPaymentOf(m, plan.id)?.status : payments.find((p) => p.member_id === m.id && p.plan_id === plan.id)?.status;
   const myHoldOk = plan.per_person_cents < 50 || ["requires_capture", "succeeded"].includes((me && holdStatusOf(me)) ?? "");
-  const captured = group.status === "captured";
-  const done = captured || group.status === "cancelled";
+  const done = group.status === "cancelled";
   const myOver = me ? overCapBy(plan.per_person_cents, me.budget_cap_cents) : null;
 
   return (
     <section className="space-y-4 rounded-2xl bg-white p-4 shadow-md">
-      {captured ? (
-        <div className="rounded-xl bg-emerald-50 p-4 text-center text-emerald-800">
-          <p className="text-3xl">🎉</p>
-          <p className="text-xl font-bold">Booking confirmed</p>
-          <p className="text-sm">{plan.title} · {plan.items[0]?.start_time}</p>
-          <p className="text-sm">{members.length} people · Total {usd(plan.total_cents)}</p>
-          {simulated && <p className="mt-2"><SimBadge /></p>}
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wide text-gray-500">
+            Locked plan {simulated && <SimBadge />}
+          </p>
+          <h2 className="text-xl font-bold text-gray-900">{plan.title}</h2>
         </div>
-      ) : (
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500">
-              Locked plan {simulated && <SimBadge />}
-            </p>
-            <h2 className="text-xl font-bold text-gray-900">{plan.title}</h2>
-          </div>
-          <div className="shrink-0 text-right">
-            <div className="text-2xl font-bold text-indigo-600">{usd(plan.per_person_cents)}</div>
-            <div className="text-xs text-gray-500">estimated / person</div>
-          </div>
+        <div className="shrink-0 text-right">
+          <div className="text-2xl font-bold text-indigo-600">{usd(plan.per_person_cents)}</div>
+          <div className="text-xs text-gray-500">estimated / person</div>
         </div>
-      )}
+      </div>
 
       <ol className="list-decimal space-y-1 pl-5">
         {plan.items.map((it, i) => (
@@ -84,15 +74,21 @@ export function LockedPlan({ group, plan, members, payments, simulated, me, reje
           {members.map((m) => {
             const s = statusOf(m, plan, holdStatusOf(m));
             const over = overCapBy(plan.per_person_cents, m.budget_cap_cents);
+            const { card } = holdOf(m, plan, payments, simulated);
             return (
               <li key={m.id} className="flex items-center gap-2 text-sm">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${s.cls}`}>{s.icon}</span>
-                <span className="font-medium">{m.display_name}</span>
-                <span className="text-gray-500">
-                  {usd(plan.per_person_cents)} / {usd(m.budget_cap_cents)}
-                  {over ? <span className="text-amber-600"> ⚠ {usd(over)} over</span> : null}
-                </span>
-                <span className={`ml-auto rounded px-2 py-0.5 text-xs ${s.cls}`}>{s.label}</span>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${s.cls}`}>{s.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-medium">{m.display_name}</span>
+                    <span className="text-gray-500">
+                      {usd(plan.per_person_cents)} / {usd(m.budget_cap_cents)}
+                      {over ? <span className="text-amber-600"> ⚠ {usd(over)} over</span> : null}
+                    </span>
+                  </div>
+                  {card && <CardLabel card={card} className="text-gray-500" />}
+                </div>
+                <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${s.cls}`}>{s.label}</span>
               </li>
             );
           })}
@@ -141,27 +137,11 @@ export function LockedPlan({ group, plan, members, payments, simulated, me, reje
           Cancel group & release all holds
         </button>
       )}
-
-      {captured && (
-        <div className="border-t border-gray-100 pt-4">
-          {group.recap_image_url ? (
-            <img src={group.recap_image_url} alt="Grok Imagine recap card" className="w-full rounded-xl shadow" />
-          ) : (
-            <button
-              onClick={onRecap}
-              disabled={busy}
-              className="w-full rounded-xl border-2 border-dashed border-gray-300 p-4 text-gray-500 transition-colors hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-50"
-            >
-              🎨 Make a recap card (Grok Imagine)
-            </button>
-          )}
-        </div>
-      )}
     </section>
   );
 }
 
-function SimBadge() {
+export function SimBadge() {
   return (
     <span
       title="No Stripe call is made in this mode. See README: Simulated payments."

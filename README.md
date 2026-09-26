@@ -1,6 +1,8 @@
 # Quorum
 
-**Turn group-chat chaos into a plan everyone can afford.** Friends create or join a group from their phones, set a personal spending limit, and chat. One tap sends the chat to **Grok**, which extracts each person's budget, diet, availability, and transport and proposes 2–3 real Atlanta plans with an *estimated* per-person cost and a note on why each plan fits each person. The server (not the AI) re-checks every price and budget. Everyone approves or rejects live. If someone rejects a plan as "too expensive", Grok regenerates with everyone's cap as a hard limit. When the organizer locks a plan, each person places a **Stripe test-mode card hold** (manual capture), and money is captured only when **every** member has approved. Anyone over their cap must explicitly approve the higher amount. Built at HackGT 13.
+*Turn messy group chats into a plan everyone can pay for.*
+
+Friends create or join a group from their phones, set a personal spending limit, and chat. One tap sends the chat to **Grok**, which extracts each person's budget, diet, availability, and transport and proposes 2–3 real Atlanta plans with an *estimated* per-person cost and a note on why each plan fits each person. The server (not the AI) re-checks every price and budget. Everyone approves or rejects live. If someone rejects a plan as "too expensive", Grok regenerates with everyone's cap as a hard limit. When the organizer locks a plan, each person places a **Stripe test-mode card hold** (manual capture), and money is captured only when **every** member has approved. Anyone over their cap must explicitly approve the higher amount. Built at HackGT 13.
 
 ## Stack
 
@@ -133,7 +135,7 @@ GROK_API_KEY=xai-... python3 run.py
 
 | Card | Result |
 | --- | --- |
-| `4242 4242 4242 4242` | Hold succeeds (`requires_capture`) |
+| `4242 4242 4242 4242` (Visa) | Hold succeeds (`requires_capture`). Use this one for the demo. |
 | `4000 0027 6000 3184` | 3-D Secure challenge |
 | `4000 0000 0000 9995` | Declined (insufficient funds) |
 
@@ -160,7 +162,7 @@ How it syncs: simulated state lives in `members.constraints.sim_payment` plus th
 
 **0:55, live approve/reject (Meta).** Everyone approves or rejects from their own phone, and tallies update in real time. On the flagged "splurge" plan, Maya taps **Reject → Too expensive**. Every phone shows "Maya rejected the plan. Reason: too expensive." The organizer taps **Regenerate within everyone's cap**, and every new plan fits every cap. The server double-checks Grok's math ("Checked by server").
 
-**1:20, trusted payments (Visa: commerce + trust).** The organizer locks the winning plan. Each friend taps **Approve & hold my share** with card 4242. Explain that this is an **authorization hold, not a charge**. Show 2 uncaptured payments in the Stripe Dashboard. The last approval captures everything, and the screen shows **Booking confirmed 🎉**. Nobody Venmo-chases anyone.
+**1:20, trusted payments (Visa: commerce + trust).** The organizer locks the winning plan. Each friend taps **Approve & hold my share** with Stripe's Visa test card 4242 4242 4242 4242. Every approval row, the split, and "Your plan" show the card as Visa •••• 4242. Explain that this is an **authorization hold, not a charge**. Show 2 uncaptured payments in the Stripe Dashboard. The last approval captures everything, and the screen shows **Booking confirmed 🎉**. Nobody Venmo-chases anyone.
 
 **1:50, edge cases.** In a second group, lock an over-cap plan. Maya sees *"This plan is $42, above your $30 cap. Approve anyway?"*, and nothing is held until she says yes. Then **Cancel group**: every hold is released.
 
