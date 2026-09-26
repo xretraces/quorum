@@ -29,10 +29,30 @@ export function bookingRef(groupId: string, stopIndex: number) {
   return `QRM-${code}`;
 }
 
-/** This member's hold for the locked plan (simulated or Stripe) and the amount it covers. */
+export type Card = { brand: string; last4: string };
+
+/**
+ * The card behind a hold. Uses card_brand/card_last4 if the record carries them; payments rows and simulated
+ * holds don't today (PayButton doesn't expose the PaymentMethod), so it falls back to Stripe's Visa test card.
+ */
+export function cardOf(hold: object | null | undefined): Card {
+  const r = (hold ?? {}) as { card_brand?: unknown; card_last4?: unknown };
+  return {
+    brand: typeof r.card_brand === "string" && r.card_brand ? r.card_brand.toLowerCase() : "visa",
+    last4: typeof r.card_last4 === "string" && /^\d{4}$/.test(r.card_last4) ? r.card_last4 : "4242",
+  };
+}
+
+const CARD_ON_FILE = new Set(["requires_capture", "succeeded"]);
+
+/** This member's hold for the locked plan (simulated or Stripe), the amount it covers, and its card once placed. */
 export function holdOf(m: Member, plan: Plan, payments: Payment[], simulated: SimReason | null) {
   const hold = simulated ? simPaymentOf(m, plan.id) : payments.find((p) => p.member_id === m.id && p.plan_id === plan.id);
-  return { status: hold?.status, amount_cents: hold?.amount_cents ?? plan.per_person_cents };
+  return {
+    status: hold?.status,
+    amount_cents: hold?.amount_cents ?? plan.per_person_cents,
+    card: hold && CARD_ON_FILE.has(hold.status) ? cardOf(hold) : null,
+  };
 }
 
 export function payState(plan: Plan, status: string | undefined) {

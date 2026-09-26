@@ -5,6 +5,7 @@ import {
   bookingRef, dietNotesFor, dietOf, holdOf, legBetween, MODE, parseStart, payState, transportOf,
 } from "../lib/booking";
 import { type Member, type Payment, type Plan, type SimReason, usd } from "../lib/supabase";
+import { CardLabel } from "./CardLabel";
 import { DemoPlanPill, GrokSays } from "./Grok";
 
 type Props = { groupId: string; plan: Plan; me: Member; payments: Payment[]; simulated: SimReason | null };
@@ -68,6 +69,7 @@ export function YourPlan({ groupId, plan, me, payments, simulated }: Props) {
         </span>
         <p className="mt-2 text-4xl font-bold tracking-tight">{usd(share)}</p>
         <p className="text-sm text-indigo-100">Your share of {usd(plan.total_cents)}</p>
+        {hold.card && <CardLabel card={hold.card} className="mt-1.5 text-indigo-100" />}
         {cap !== null && (
           <>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/20">

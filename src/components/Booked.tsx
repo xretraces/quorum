@@ -2,6 +2,7 @@
 // card per stop with a demo booking reference, the total paid, the per-person split, and this phone's plan.
 import { avatarColor, bookingRef, catalogEntry, holdOf, initials, parseStart, payState } from "../lib/booking";
 import { type Group, type Member, type Payment, type Plan, type SimReason, statusBadge, usd } from "../lib/supabase";
+import { CardLabel } from "./CardLabel";
 import { SimBadge } from "./LockedPlan";
 import { YourPlan } from "./YourPlan";
 
@@ -19,7 +20,7 @@ type Props = {
 export function Booked({ group, plan, members, payments, simulated, me, onRecap, busy }: Props) {
   const rows = members.map((m) => {
     const hold = holdOf(m, plan, payments, simulated);
-    return { m, amount: hold.amount_cents, state: payState(plan, hold.status), paid: hold.status === "succeeded" };
+    return { m, amount: hold.amount_cents, state: payState(plan, hold.status), paid: hold.status === "succeeded", card: hold.card };
   });
   const totalPaid = rows.reduce((sum, r) => sum + (r.paid ? r.amount : 0), 0);
   const paidCount = rows.filter((r) => r.paid).length;
@@ -117,15 +118,20 @@ export function Booked({ group, plan, members, payments, simulated, me, onRecap,
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {rows.map(({ m, amount, state }) => (
+            {rows.map(({ m, amount, state, card }) => (
               <tr key={m.id}>
                 <td className="py-2">
                   <span className="flex items-center gap-2">
                     <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ${avatarColor(m.display_name)}`}>
                       {initials(m.display_name)}
                     </span>
-                    <span className="truncate font-medium text-gray-900">{m.display_name}</span>
-                    {m.id === me?.id && <span className="text-xs text-gray-400">you</span>}
+                    <span className="min-w-0">
+                      <span className="flex items-baseline gap-2">
+                        <span className="truncate font-medium text-gray-900">{m.display_name}</span>
+                        {m.id === me?.id && <span className="text-xs text-gray-400">you</span>}
+                      </span>
+                      {card && <CardLabel card={card} className="text-gray-500" />}
+                    </span>
                   </span>
                 </td>
                 <td className="py-2 text-right tabular-nums">{usd(amount)}</td>
@@ -146,7 +152,7 @@ export function Booked({ group, plan, members, payments, simulated, me, onRecap,
         <p className="mt-3 text-center text-xs text-gray-400">
           {simulated
             ? "Simulated payment (test): no card was charged and nothing was sent to Stripe."
-            : "Stripe test mode: holds were captured with test cards. No real money moved."}
+            : "Stripe test mode: holds were captured on test cards (Stripe's Visa test card is 4242 4242 4242 4242). No real money moved."}
         </p>
       </section>
 

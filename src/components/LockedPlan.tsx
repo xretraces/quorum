@@ -1,7 +1,9 @@
 // Locked plan + status screen: per-member approval/hold status, my PayButton (kit), reject. Once every hold is
 // captured, GroupBoard shows Booked instead.
+import { holdOf } from "../lib/booking";
 import { type Fallback, SIM_REASON_TEXT, simPaymentOf } from "../lib/payments";
 import { type Group, type Member, overCapBy, type Payment, type Plan, rejectionOf, type SimReason, usd } from "../lib/supabase";
+import { CardLabel } from "./CardLabel";
 import { PayButton } from "./PayButton";
 import { RejectButton } from "./RejectButton";
 
@@ -72,15 +74,21 @@ export function LockedPlan({ group, plan, members, payments, simulated, me, reje
           {members.map((m) => {
             const s = statusOf(m, plan, holdStatusOf(m));
             const over = overCapBy(plan.per_person_cents, m.budget_cap_cents);
+            const { card } = holdOf(m, plan, payments, simulated);
             return (
               <li key={m.id} className="flex items-center gap-2 text-sm">
-                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${s.cls}`}>{s.icon}</span>
-                <span className="font-medium">{m.display_name}</span>
-                <span className="text-gray-500">
-                  {usd(plan.per_person_cents)} / {usd(m.budget_cap_cents)}
-                  {over ? <span className="text-amber-600"> ⚠ {usd(over)} over</span> : null}
-                </span>
-                <span className={`ml-auto rounded px-2 py-0.5 text-xs ${s.cls}`}>{s.label}</span>
+                <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${s.cls}`}>{s.icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-medium">{m.display_name}</span>
+                    <span className="text-gray-500">
+                      {usd(plan.per_person_cents)} / {usd(m.budget_cap_cents)}
+                      {over ? <span className="text-amber-600"> ⚠ {usd(over)} over</span> : null}
+                    </span>
+                  </div>
+                  {card && <CardLabel card={card} className="text-gray-500" />}
+                </div>
+                <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${s.cls}`}>{s.label}</span>
               </li>
             );
           })}
