@@ -10,7 +10,7 @@ import { TOO_EXPENSIVE } from "./RejectButton";
 
 type SpeechRec = { lang: string; start: () => void; onresult: (e: { results: { transcript: string }[][] }) => void; onerror: () => void };
 
-export function GroupBoard({ groupId }: { groupId: string }) {
+export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () => void }) {
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -140,12 +140,16 @@ export function GroupBoard({ groupId }: { groupId: string }) {
   }
 
   const locked = plans.find((p) => p.id === group?.selected_plan_id);
+  const home = (e: React.MouseEvent) => {
+    e.preventDefault();
+    onHome();
+  };
 
   if (!group) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gradient-to-b from-indigo-50 to-white p-4">
         <p className="text-gray-600">{err ?? "Loading…"}</p>
-        {err && <a href="/" className="text-indigo-600 underline">Back home</a>}
+        {err && <a href="/" onClick={home} className="text-indigo-600 underline">Back home</a>}
       </div>
     );
   }
@@ -155,12 +159,20 @@ export function GroupBoard({ groupId }: { groupId: string }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
       <div className="mx-auto max-w-2xl space-y-4 p-4">
-        <header className="flex items-center justify-between">
-          <div>
-            <a href="/" className="text-xs font-bold uppercase tracking-wide text-indigo-600">Quorum</a>
-            <h1 className="text-2xl font-bold text-gray-900">{group.name}</h1>
+        <header className="flex items-center gap-3">
+          <a
+            href="/"
+            onClick={home}
+            aria-label="Back to your groups"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl text-indigo-600 shadow-md transition-colors hover:bg-indigo-50"
+          >
+            ←
+          </a>
+          <div className="min-w-0 flex-1">
+            <a href="/" onClick={home} className="text-xs font-bold uppercase tracking-wide text-indigo-600">Quorum · Your groups</a>
+            <h1 className="truncate text-2xl font-bold text-gray-900">{group.name}</h1>
           </div>
-          <span className="rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">{group.status}</span>
+          <span className="shrink-0 rounded-full bg-indigo-100 px-3 py-1 text-sm font-medium text-indigo-700">{group.status}</span>
         </header>
 
         {!me && (

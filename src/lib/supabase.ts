@@ -24,8 +24,13 @@ export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay
 }
 
 /** Demo "identity": which member am I in this group? (No auth. Stored per browser.) */
-export const myMemberId = (groupId: string) => localStorage.getItem(`pp:member:${groupId}`);
-export const setMyMemberId = (groupId: string, memberId: string) => localStorage.setItem(`pp:member:${groupId}`, memberId);
+const MEMBER_KEY = "pp:member:";
+export const myMemberId = (groupId: string) => localStorage.getItem(`${MEMBER_KEY}${groupId}`);
+export const setMyMemberId = (groupId: string, memberId: string) => localStorage.setItem(`${MEMBER_KEY}${groupId}`, memberId);
+/** Every group this browser has created or joined (one `pp:member:<groupId>` key per group). */
+export const myGroupIds = () =>
+  Object.keys(localStorage).filter((k) => k.startsWith(MEMBER_KEY)).map((k) => k.slice(MEMBER_KEY.length));
+export const forgetGroup = (groupId: string) => localStorage.removeItem(`${MEMBER_KEY}${groupId}`);
 
 export const usd = (cents: number | null | undefined) =>
   cents === null || cents === undefined ? "n/a" : `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
