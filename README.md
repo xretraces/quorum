@@ -1,6 +1,8 @@
 # Quorum
 
-**Turn group-chat chaos into a plan everyone can afford.** Friends create or join a group from their phones, set a personal spending limit, and chat. One tap sends the chat to **Grok**, which extracts each person's budget, diet, availability, and transport and proposes 2–3 real Atlanta plans with an *estimated* per-person cost and a note on why each plan fits each person. The server (not the AI) re-checks every price and budget. Everyone approves or rejects live. If someone rejects a plan as "too expensive", Grok regenerates with everyone's cap as a hard limit. When the organizer locks a plan, each person places a **Stripe test-mode card hold** (manual capture), and money is captured only when **every** member has approved. Anyone over their cap must explicitly approve the higher amount. Built at HackGT 13.
+*Turn messy group chats into a plan everyone can pay for.*
+
+Friends create or join a group from their phones, set a personal spending limit, and chat. One tap sends the chat to **Grok**, which extracts each person's budget, diet, availability, and transport and proposes 2–3 real Atlanta plans with an *estimated* per-person cost and a note on why each plan fits each person. The server (not the AI) re-checks every price and budget. Everyone approves or rejects live. If someone rejects a plan as "too expensive", Grok regenerates with everyone's cap as a hard limit. When the organizer locks a plan, each person places a **Stripe test-mode card hold** (manual capture), and money is captured only when **every** member has approved. Anyone over their cap must explicitly approve the higher amount. Built at HackGT 13.
 
 ## Stack
 
