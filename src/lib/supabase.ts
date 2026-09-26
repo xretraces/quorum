@@ -6,19 +6,34 @@ export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY, // publishable (sb_publishable_...) or legacy anon key
 );
 
+/**
+ * Edge Function failure. `status` is undefined for network/relay failures. `fromFunction` is true when the
+ * body was our own `{ error }` JSON (a deliberate HttpError), false for platform errors such as
+ * "function not deployed".
+ */
+export class InvokeError extends Error {
+  constructor(message: string, public status: number | undefined, public fromFunction: boolean) {
+    super(message);
+  }
+}
+
 /** Calls an Edge Function and surfaces its JSON `{ error }` message on failure. */
 export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay" | "recap-image", body: unknown): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body: body as Record<string, unknown> });
   if (error) {
     let msg = error.message;
+    let status: number | undefined;
+    let fromFunction = false;
     const ctx = (error as { context?: unknown }).context;
     if (ctx instanceof Response) {
+      status = ctx.status;
       try {
         const j = await ctx.json();
-        msg = j.error ? `${j.error}${j.details ? `: ${JSON.stringify(j.details)}` : ""}` : msg;
+        fromFunction = typeof j.error === "string";
+        msg = j.error ? `${j.error}${j.details ? `: ${JSON.stringify(j.details)}` : ""}` : j.message ?? msg;
       } catch { /* not JSON */ }
     }
-    throw new Error(msg);
+    throw new InvokeError(msg, status, fromFunction);
   }
   return data as T;
 }
@@ -46,8 +61,20 @@ export type Member = {
   id: string; group_id: string; display_name: string; is_organizer: boolean; budget_cap_cents: number | null;
   cap_source: string; dietary: string | null; availability: string | null; transport: string | null;
   vote_plan_id: string | null; approved: boolean; approved_amount_cents: number | null;
-  constraints: Record<string, unknown> & { rejection?: Rejection };
+  constraints: Record<string, unknown> & { rejection?: Rejection; sim_payment?: SimPayment };
 };
+/**
+ * Simulated card hold (no Stripe), stored under members.constraints.sim_payment. `status` uses Stripe
+ * PaymentIntent status names so the UI treats it like a real hold. See lib/payments.ts.
+ */
+export type SimPayment = {
+  plan_id: string;
+  status: "requires_payment_method" | "requires_capture" | "succeeded" | "canceled";
+  amount_cents: number;
+  over_cap_reapproved: boolean;
+  reason: SimReason;
+};
+export type SimReason = "forced" | "not_configured" | "stripe_error";
 /** Stored under members.constraints.rejection (no schema change needed). make-plan overwrites constraints, which clears it. */
 export type Rejection = { plan_id: string; reason: string; at: string };
 
