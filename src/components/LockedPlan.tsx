@@ -1,6 +1,7 @@
 // Locked plan + status screen: per-member approval/hold status, my PayButton (kit), reject, and the
 // "Booking confirmed" view once the pay function has captured every hold.
-import { type Group, type Member, overCapBy, type Payment, type Plan, rejectionOf, usd } from "../lib/supabase";
+import { type Fallback, SIM_REASON_TEXT, simPaymentOf } from "../lib/payments";
+import { type Group, type Member, overCapBy, type Payment, type Plan, rejectionOf, type SimReason, usd } from "../lib/supabase";
 import { PayButton } from "./PayButton";
 import { RejectButton } from "./RejectButton";
 
@@ -9,27 +10,29 @@ type Props = {
   plan: Plan;
   members: Member[];
   payments: Payment[];
+  simulated: SimReason | null;
   me: Member | undefined;
   rejected: boolean;
   onRefresh: () => void;
   onCancel: () => void;
   onRecap: () => void;
+  onFallback: (f: Fallback) => void;
   busy: boolean;
 };
 
-function statusOf(m: Member, plan: Plan, pay: Payment | undefined) {
+function statusOf(m: Member, plan: Plan, holdStatus: string | undefined) {
   if (rejectionOf(m, [plan.id])) return { icon: "✗", label: "Rejected", cls: "bg-red-100 text-red-700" };
-  if (pay?.status === "succeeded") return { icon: "✓", label: "Paid", cls: "bg-emerald-100 text-emerald-700" };
-  const held = pay?.status === "requires_capture" || plan.per_person_cents < 50;
+  if (holdStatus === "succeeded") return { icon: "✓", label: "Paid", cls: "bg-emerald-100 text-emerald-700" };
+  const held = holdStatus === "requires_capture" || plan.per_person_cents < 50;
   if (m.approved && held) return { icon: "✓", label: "Approved · hold placed", cls: "bg-emerald-100 text-emerald-700" };
   if (m.approved) return { icon: "…", label: "Approved · card pending", cls: "bg-blue-100 text-blue-700" };
   return { icon: "⏳", label: "Pending", cls: "bg-gray-100 text-gray-600" };
 }
 
-export function LockedPlan({ group, plan, members, payments, me, rejected, onRefresh, onCancel, onRecap, busy }: Props) {
-  const payFor = (id: string) => payments.find((p) => p.member_id === id && p.plan_id === plan.id);
-  const myPay = me ? payFor(me.id) : undefined;
-  const myHoldOk = plan.per_person_cents < 50 || ["requires_capture", "succeeded"].includes(myPay?.status ?? "");
+export function LockedPlan({ group, plan, members, payments, simulated, me, rejected, onRefresh, onCancel, onRecap, onFallback, busy }: Props) {
+  const holdStatusOf = (m: Member) =>
+    simulated ? simPaymentOf(m, plan.id)?.status : payments.find((p) => p.member_id === m.id && p.plan_id === plan.id)?.status;
+  const myHoldOk = plan.per_person_cents < 50 || ["requires_capture", "succeeded"].includes((me && holdStatusOf(me)) ?? "");
   const captured = group.status === "captured";
   const done = captured || group.status === "cancelled";
   const myOver = me ? overCapBy(plan.per_person_cents, me.budget_cap_cents) : null;
@@ -42,11 +45,14 @@ export function LockedPlan({ group, plan, members, payments, me, rejected, onRef
           <p className="text-xl font-bold">Booking confirmed</p>
           <p className="text-sm">{plan.title} · {plan.items[0]?.start_time}</p>
           <p className="text-sm">{members.length} people · Total {usd(plan.total_cents)}</p>
+          {simulated && <p className="mt-2"><SimBadge /></p>}
         </div>
       ) : (
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500">Locked plan</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500">
+              Locked plan {simulated && <SimBadge />}
+            </p>
             <h2 className="text-xl font-bold text-gray-900">{plan.title}</h2>
           </div>
           <div className="shrink-0 text-right">
@@ -68,7 +74,7 @@ export function LockedPlan({ group, plan, members, payments, me, rejected, onRef
       {group.status === "cancelled" && (
         <div className="rounded-xl bg-gray-100 p-4 text-center text-gray-600">
           <p className="font-semibold">Cancelled</p>
-          <p className="text-sm">All card holds have been released.</p>
+          <p className="text-sm">All {simulated ? "simulated " : "card "}holds have been released.</p>
         </div>
       )}
 
@@ -76,7 +82,7 @@ export function LockedPlan({ group, plan, members, payments, me, rejected, onRef
         <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Group approval</p>
         <ul className="space-y-2">
           {members.map((m) => {
-            const s = statusOf(m, plan, payFor(m.id));
+            const s = statusOf(m, plan, holdStatusOf(m));
             const over = overCapBy(plan.per_person_cents, m.budget_cap_cents);
             return (
               <li key={m.id} className="flex items-center gap-2 text-sm">
@@ -101,7 +107,14 @@ export function LockedPlan({ group, plan, members, payments, me, rejected, onRef
               You'll be asked to approve anyway, or you can reject it.
             </p>
           )}
-          <PayButton groupId={group.id} memberId={me.id} planId={plan.id} onChange={onRefresh} />
+          <PayButton
+            groupId={group.id}
+            memberId={me.id}
+            planId={plan.id}
+            simulated={simulated}
+            onChange={onRefresh}
+            onFallback={onFallback}
+          />
           <RejectButton me={me} plan={plan} disabled={busy} />
         </div>
       )}
@@ -112,9 +125,16 @@ export function LockedPlan({ group, plan, members, payments, me, rejected, onRef
         </p>
       )}
 
-      <p className="text-center text-xs text-gray-400">
-        Payment: Stripe <b>test mode</b> card holds (manual capture). Nothing is charged until everyone approves. No real money moves.
-      </p>
+      {simulated ? (
+        <p className="text-center text-xs text-gray-500">
+          <SimBadge /> {SIM_REASON_TEXT[simulated]} Holds, approvals, and capture are simulated: no card is charged and
+          nothing is sent to Stripe.
+        </p>
+      ) : (
+        <p className="text-center text-xs text-gray-400">
+          Payment: Stripe <b>test mode</b> card holds (manual capture). Nothing is charged until everyone approves. No real money moves.
+        </p>
+      )}
 
       {me?.is_organizer && !done && (
         <button onClick={onCancel} disabled={busy} className="text-sm text-red-600 underline hover:text-red-700 disabled:opacity-50">
@@ -138,5 +158,16 @@ export function LockedPlan({ group, plan, members, payments, me, rejected, onRef
         </div>
       )}
     </section>
+  );
+}
+
+function SimBadge() {
+  return (
+    <span
+      title="No Stripe call is made in this mode. See README: Simulated payments."
+      className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold normal-case tracking-normal text-amber-800"
+    >
+      Simulated payment (test)
+    </span>
   );
 }
