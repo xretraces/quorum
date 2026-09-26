@@ -53,6 +53,10 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
     if (finished && finishMs >= hideAt) onDone();
   }, [finished, finishMs, hideAt, onDone]);
 
+  useEffect(() => {
+    if (allDone) ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [allDone]);
+
   const clockS = Math.floor(elapsedS);
   const clock = `${Math.floor(clockS / 60)}:${String(clockS % 60).padStart(2, "0")}`;
   const demo = run.outcome === "demo";
