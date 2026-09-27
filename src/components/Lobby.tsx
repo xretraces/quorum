@@ -104,7 +104,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
       </section>
 
       <div className="mx-auto flex w-full max-w-3xl items-start gap-8 max-sm:flex-col">
-        <section className="min-w-0 flex-1">
+        <section className="w-full min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="q-h2 text-xl">{t("lobby.whosIn", { count: members.length })}</h2>
             <span className="text-xs font-bold tabular-nums text-navy/55">{t("lobby.readyCount", { ready, total: members.length })}</span>
