@@ -1,4 +1,4 @@
-// "Your plan": the winning plan, shown live on every member's phone once the vote is decided. Recap picture,
+// "Your plan": the winning plan, shown live on every member's phone once the vote is decided. Grok Imagine poster,
 // itinerary, Add to calendar (.ics) and Share.
 import { useState } from "react";
 import { catalogEntry, parseStart } from "../lib/booking";
@@ -51,6 +51,7 @@ export function FinalPlan({ group, plan, members, painting }: Props) {
 
       <div className="rounded-2xl bg-white p-3 shadow-md">
         <Recap plan={plan} url={plan.recap_image_url ?? group.recap_image_url} painting={painting} />
+        <p className="mt-1 px-1 text-[11px] text-gray-500">✨ Your plan poster by Grok Imagine</p>
 
         <ol className="mt-4 px-1">
           {plan.items.map((it, i) => {

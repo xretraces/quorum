@@ -1,4 +1,4 @@
-// Grok Imagine picture of a plan's itinerary (recap-image). While it's being made, or if it never arrives,
+// Grok Imagine poster of the winning plan (recap-image, final screen only). While it's being made, or if it never arrives,
 // a gradient card with the plan's stops stands in, so the flow never waits on the image.
 import { useState } from "react";
 import type { Plan } from "../lib/supabase";
@@ -18,7 +18,7 @@ export function Recap({ plan, url, painting, className = "" }: { plan: Plan; url
       {show ? (
         <img
           src={url}
-          alt={`Grok Imagine picture of ${plan.title}`}
+          alt={`Grok Imagine poster of ${plan.title}`}
           className="h-full w-full object-cover"
           onError={() => setBroken(url)}
         />
@@ -30,7 +30,7 @@ export function Recap({ plan, url, painting, className = "" }: { plan: Plan; url
       )}
       {painting && !show && (
         <span className="absolute right-2 top-2 rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white motion-safe:animate-pulse">
-          ✨ Grok Imagine is painting…
+          ✨ Grok Imagine is painting your poster…
         </span>
       )}
     </div>
