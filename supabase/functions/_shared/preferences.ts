@@ -10,7 +10,7 @@ export type Preferences = {
 
 export const MAX_TRANSCRIPT_CHARS = 2000;
 const MAX_BUDGET = 1000;
-const MAX_TEXT = 500;
+const MAX_TEXT = 1500; // keep in sync with the Other textarea maxLength (Questionnaire.tsx)
 
 /**
  * Grok structured output. Strict mode wants every key required, so "not mentioned" is null and the
