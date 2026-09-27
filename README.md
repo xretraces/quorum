@@ -2,14 +2,25 @@
 
 *Everyone answers privately. Grok finds the plan that works for all of you.*
 
-The creator makes a group and shows a big **QR code** (or copies/shares the link). Friends scan it and join with just a name; the lobby shows them appearing live. Each person fills a short **private questionnaire** (budget, food, getting there, when they're free, hard no's, anything else). **Only Grok sees the answers**; everyone else just sees a ✓ Ready checkmark. When everyone is ready (or at least 2 and the creator taps "Plan it anyway"), the creator taps **Ask Grok**. The `make-plan` function reads the answers server-side and returns 2-3 real Atlanta plans; budget is a hard per-person cap and hard no's are strict exclusions, re-checked by the server. Each card shows **real photos of the venues** (freely licensed, from Wikimedia Commons), a group-level "why it fits" line that never names anyone, and labels like "Fits everyone" / "Cheapest". Everyone taps **I'm in** on one plan; once everyone has voted the top plan wins (the creator breaks ties) and every phone switches live to **Your plan** with a **Grok Imagine** poster and **Add to calendar**. No chat, no payments. Built at HackGT 13.
+Live: https://quorum-eight-mu.vercel.app · Built at HackGT 13.
+
+The creator makes a group and shows a big **QR code** (or copies/shares the link). Friends scan it and join with just a name; the lobby shows them appearing live. Each person fills a short **private questionnaire** with four fields: **Budget** (max $ per person), **Dietary**, **Availability** and **Other**. A blank field means "no preference". **Only Grok sees the answers**; everyone else just sees a ✓ Ready checkmark. When everyone is ready (or at least 2 people are and the creator taps "Plan it anyway"), the creator taps **Ask Grok**. The `make-plan` function reads the answers server-side and returns 2-3 real Atlanta plans. Budget is a hard per-person cap and hard no's are strict exclusions, and the server re-checks both. Each card shows **pictures of the venues** (freely licensed photos, or a Grok Imagine picture where no real photo of the place exists), a group-level "why it fits" line that never names anyone, and labels like "Fits everyone" / "Cheapest". Everyone taps **I'm in** on one plan. Once everyone has voted, the top plan wins (the creator breaks ties) and every phone switches live to **Your plan**, with a **Grok Imagine** poster, **Add to calendar** (.ics download) and Share.
+
+## Built with Grok
+
+| Grok product | Where it's used |
+| --- | --- |
+| **Grok models** (xAI API, strict JSON-schema output) | Plans: `make-plan` turns everyone's anonymized answers into 2-3 plans. Parsing: `parse-prefs` turns a spoken answer into the four questionnaire fields. Translation: the language switcher (in progress, open PR on `feat/i18n`) |
+| **Grok Imagine** | The winning plan's poster (`recap-image`), plus 6 pre-generated venue pictures for places without a usable real photo (`photoCredit.license = "AI-generated"` in `data/atlanta-activities.json`) |
+| **Grok Voice** | Spoken answers for the questionnaire (in progress on `feat/voice-fill`; the questionnaire already exposes `applyPreferences(partial)` for it) |
+
+Built with **Cursor** and **Claude Code**.
 
 ## Stack
 
-- **Web:** React 19 + Vite + TypeScript + Tailwind v4 at the repo root (`src/`), `@supabase/supabase-js`, Stripe Payment Element
-- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `pay`, `recap-image`
-- **AI:** xAI Grok (strict JSON-schema output), optional Grok Imagine recap card
-- **Payments:** Stripe **test mode** only (`capture_method=manual`)
+- **Web:** React 19 + Vite + TypeScript + Tailwind v4 at the repo root (`src/`), `@supabase/supabase-js`, `qrcode.react`
+- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `parse-prefs`, `recap-image`
+- **AI:** xAI Grok models (strict JSON-schema output) and Grok Imagine
 - **Hosting:** Vercel (web; `vercel.json` has the SPA rewrite) + Supabase (functions)
 
 ## Quickstart
@@ -17,44 +28,47 @@ The creator makes a group and shows a big **QR code** (or copies/shares the link
 ```bash
 git clone <this repo> quorum && cd quorum
 npm install
-cp .env.example .env.local   # Supabase URL + publishable key are pre-filled; add your pk_test_ Stripe key
+cp .env.example .env.local   # VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY (publishable key) are pre-filled
 npm run dev                  # http://localhost:5173
 ```
 
-Create a group, then open the invite link (or enter the group code on the home screen) in a second browser or an incognito window to join as another person. Each browser stores its `memberId` per group in `localStorage` (no login).
+Create a group, then open the invite link (or enter the invite code on the home screen) in a second browser or an incognito window to join as another person. There's no login: each browser stores its member id per group in `localStorage` (`pp:member:<groupId>`) and the token for its private answers (`pp:token:<memberId>`).
 
-`npm run build` type-checks (`tsc -b`) and builds. `npm run lint` runs ESLint on the web app.
+`npm run build` type-checks (`tsc -b`) and builds. `npm run lint` runs ESLint on the web app. Optional: `VITE_PUBLIC_URL` changes where invite links and the QR code point (defaults to the live site).
 
 ## Repo layout
 
 ```
 src/                     React app
-  components/            CreateGroup (home: create + join by code), JoinGroup, GroupBoard, GroupChat,
-                         PlanCard, RejectButton, LockedPlan (status/booking), PayButton (kit, Stripe)
-  lib/supabase.ts        client, invoke() helper, types, money + budget helpers (kit web-snippet + additions)
-  lib/payments.ts        pay-function calls + simulated payments fallback (no Stripe; see "Simulated payments")
+  components/            CreateGroup (home: create + join by code), YourGroups, JoinGroup, GroupBoard, Lobby,
+                         Questionnaire, GrokWorking, PlanCard, VenuePhotos, FinalPlan, Recap
+  lib/supabase.ts        client, invoke() helper, types, localStorage identity helpers
+  lib/prefs.ts           private answers: claim_member / save_my_prefs / get_my_prefs RPCs
+  lib/parsePrefs.ts      client for the parse-prefs function
+  lib/calendar.ts        .ics export for the winning plan
   lib/fallback.ts        saved demo plans, used only if the make-plan call fails
 supabase/
-  functions/             make-plan, pay, recap-image, parse-prefs + _shared (logic, tests, generated catalog/schema/prompt)
-  migrations/            20260926000001_schema.sql (kit schema.sql), 20260926000002_messages.sql (group chat)
+  functions/             make-plan, parse-prefs, recap-image + _shared (plan rules, preferences, generated catalog)
+  migrations/            schema + private answers (see Database)
   config.toml            verify_jwt = false for every function
-data/                    atlanta-activities.json (catalog; prices are approximate demo data)
-prompts/                 make-plan.md (Grok system prompt, between PROMPT markers)
-schema/                  plan.schema.json (strict Grok output schema)
-scripts/sync-shared.sh   regenerate supabase/functions/_shared/*.ts after editing data/, schema/, prompts/
-tools/prompt-tests/      run.py: live-test the Grok prompt against sample chats (Python stdlib only)
+data/                    atlanta-activities.json (venue catalog; prices are approximate demo data, photo credits)
+public/venues/           venue pictures shown on plan cards
+scripts/sync-shared.sh   regenerate supabase/functions/_shared/catalog.ts (and friends) after editing data/
 docs/TEAM_SPEC.md        original product spec (screens/flow/UX; ignore its Express/Firebase backend)
 ```
 
+`prompts/`, `schema/` and `tools/prompt-tests/` hold an earlier planning prompt, its schema and its tests. The current `make-plan` doesn't use them; its prompt and schema live in `supabase/functions/_shared/prefsPlan.ts`. A few other files left over from an earlier prototype are not used by the app either.
+
 ## Database
 
-Project ref **`oavxpwpdhdazhtieikju`**. The first two migrations are **already applied** to the live database; the files are here for reference and for fresh projects. Don't re-run them against the shared DB (they are idempotent, but there's no need).
+Project ref **`oavxpwpdhdazhtieikju`**. All migrations in `supabase/migrations/` are **already applied** to the live database, including `20260927000001_private_prefs.sql` (private `member_prefs` + RPCs, `members.prefs_ready`, `plans.recap_image_url`, `groups.status` value `decided`). The files are here for reference and for fresh projects.
 
-- **Not applied yet:** `20260927000001_private_prefs.sql` (private `member_prefs` + RPCs, `members.prefs_ready`, `plans.recap_image_url`, `groups.status` value `decided`). The new flow needs it.
-- `groups`, `members`, `plans`, `payments`: kit schema, permissive demo RLS, Realtime on. `payments` is read-only for clients.
-- `messages`: live group chat (`sender_name`, `text`, `created_at`), Realtime on.
-- Rejections are stored in `members.constraints.rejection = { plan_id, reason, at }`, so no schema change was needed. `make-plan` overwrites `constraints`, which clears the rejection.
-- Simulated holds (see below) are stored in `members.constraints.sim_payment = { plan_id, status, amount_cents, over_cap_reapproved, reason }`, again no schema change. Nothing is written to `payments`, which stays Stripe-only.
+- `groups`: name, `invite_code`, `status` (`planning` → `voting` → `decided`), `selected_plan_id`, `recap_image_url`.
+- `members`: `display_name`, `is_organizer`, `prefs_ready` (the public ✓), `vote_plan_id`.
+- `plans`: 2-3 per group from `make-plan` (items, per-person and total price, `why_it_works`, `model`).
+- `member_prefs`: each person's private answers (see Privacy).
+
+`groups`, `members` and `plans` have permissive demo RLS and Realtime on, so every phone updates live.
 
 ## How the flow maps to the code
 
@@ -62,24 +76,39 @@ Project ref **`oavxpwpdhdazhtieikju`**. The first two migrations are **already a
 | --- | --- |
 | Create (group + your name) / join (name only) | `CreateGroup.tsx`, `JoinGroup.tsx` (both call `claimMember`) |
 | Lobby: QR, Copy link, Share, live members + ready checks | `Lobby.tsx` (`qrcode.react`, Realtime on `members`) |
-| Private questionnaire | `Questionnaire.tsx` + `lib/prefs.ts` (`save_my_prefs` / `get_my_prefs` RPCs). Voice can fill it via `ref.current.applyPreferences(partial)` |
-| Ask Grok / Plan it anyway (creator) | `GroupBoard.askGrok()` → `make-plan { group_id }` + the shared "Grok is working" card |
+| Private questionnaire (Budget, Dietary, Availability, Other) | `Questionnaire.tsx` + `lib/prefs.ts` (`save_my_prefs` / `get_my_prefs` RPCs). Voice can fill it through `ref.current.applyPreferences(partial)` |
+| Ask Grok / Plan it anyway (creator) | `GroupBoard.askGrok()` → `make-plan { group_id }` + the shared "Grok is working" card (`GrokWorking.tsx`) |
 | Plans from private answers | `make-plan` + `_shared/prefsPlan.ts` (anonymized Grok call, server re-checks, backup plans) |
-| Real venue photos per plan card | `VenuePhotos.tsx`; `photo` / `photoCredit` in `data/atlanta-activities.json`, images in `public/venues/` (Wikimedia Commons, free licenses) |
-| Grok Imagine poster for the winning plan | `Recap.tsx` on the final screen; the creator's phone calls `recap-image { group_id }` once the vote is decided (`plan_id` still supported) |
+| Venue pictures per plan card | `VenuePhotos.tsx`; `photo` / `photoCredit` in `data/atlanta-activities.json`, images in `public/venues/` (Wikimedia Commons / Openverse free licenses, or Grok Imagine) |
 | Vote, live counts, winner, tie-break | `PlanCard.tsx`, `tally()` in `GroupBoard.tsx` (`members.vote_plan_id`, `groups.selected_plan_id`, status `decided`) |
+| Grok Imagine poster for the winning plan | `Recap.tsx` on the final screen; the creator's phone calls `recap-image { group_id }` once the vote is decided |
 | Your plan, Add to calendar, Share | `FinalPlan.tsx`, `lib/calendar.ts` (.ics) |
 | Grok down | `make-plan` builds "Backup plan"s from the same answers. If `make-plan` itself can't be reached: saved "Demo plan"s (`lib/fallback.ts`, not checked against answers because the browser can't read them) |
 
-Unused but kept: `GroupChat`, `LockedPlan`, `PayButton`, `RejectButton`, `Booked`, `YourPlan`, `CardLabel`, `lib/payments.ts`, the `pay` function, the `messages` table, and the old chat prompt/schema (`prompts/make-plan.md`, `schema/plan.schema.json`, `tools/prompt-tests`), which `make-plan` no longer uses.
-
 ### Privacy of answers
 
-Answers live in `member_prefs` (migration `20260927000001_private_prefs.sql`): RLS on, **no policies**, no grants for `anon`/`authenticated`, not in Realtime. A phone proves it owns its member with a token from `claim_member` (handed out once per member, stored in that phone's `localStorage`) and reads/writes only through `save_my_prefs` / `get_my_prefs`. `make-plan` reads everyone's answers with the service role. Grok sees them as "Person 1..N"; plan rows store no per-member notes, no over-cap ids and no raw model output, and plan text that mentions a name or a dollar amount is replaced by a server-written line. Without login this is still demo-grade: whoever claims a member first owns it.
+Answers live in `member_prefs`: RLS on, **no policies**, no grants for `anon`/`authenticated`, not in Realtime. A phone proves it owns its member with a token from `claim_member` (handed out once per member, stored in that phone's `localStorage`) and reads/writes only through `save_my_prefs` / `get_my_prefs`. `make-plan` reads everyone's answers with the service role. Grok sees them as "Person 1..N"; plan rows store no per-member notes and no raw model output, and plan text that mentions a name or a dollar amount is replaced by a server-written line. Without login this is still demo-grade: whoever claims a member first owns it.
 
 ### make-plan
 
-`POST /functions/v1/make-plan { group_id }` → `{ plans, model, source: "grok" | "backup", answered }`. Needs answers from at least 2 members (1 in a solo group). Hard rules checked in code: sum of catalog prices ≤ lowest budget, no item matching a hard no (name/category/tags plus a few aliases like heights → rooftop/summit), veg-friendly food if anyone is vegetarian/vegan, transit-friendly items if anyone takes MARTA or walks, every stop inside the shared free window. Plans that fail are dropped; if none survive or Grok fails, deterministic backup plans are built from the same rules. 422 if nothing in the catalog fits.
+`POST /functions/v1/make-plan { group_id }` → `{ plans, model, source: "grok" | "backup", answered, notice }`. Needs answers from at least 2 members (1 in a solo group). Hard rules checked in code: sum of catalog prices ≤ the lowest budget, no item matching a hard no from "Other" (name/category/tags plus aliases like heights → rooftop/summit), veg-friendly food if anyone is vegetarian/vegan, transit-friendly stops if anyone takes MARTA or has no car (unless they mention rideshare), and every stop inside the shared free window from "Availability" and the venue's typical hours. Plans that fail are dropped; if none survive or Grok fails, deterministic backup plans are built from the same rules. 422 if nothing in the catalog fits. Grok gets about 110 s in total before the backup plans take over.
+
+### parse-prefs (spoken answer → questionnaire)
+
+`POST /functions/v1/parse-prefs { transcript: string, current?: Partial<Preferences> }` → `{ preferences: Partial<Preferences>, heard: string }`, with only the fields the person mentioned. `Preferences` (in `supabase/functions/_shared/preferences.ts`) has the same four fields as the form:
+
+| Field | Type | Example |
+| --- | --- | --- |
+| `budget` | number or null, max $ per person (clamped 0-1000) | "about 35 bucks" → `35` |
+| `dietary` | text: diet, allergies, cravings | "vegetarian, no peanuts" |
+| `availability` | text, in the person's words | "Saturday after 2pm" |
+| `other` | text: getting around, hard no's, anything else | "I take MARTA, no bars" |
+
+It uses the same `GROK_API_KEY` / `GROK_MODEL` secrets as make-plan. Without a key, or if Grok fails, it returns a basic regex parse (dollar amount, diet keywords, availability phrase, full transcript in `other`) instead of an error. Empty transcripts get a 400; transcripts are cut to 2000 chars. Client: `parsePrefs(transcript, current?)` in `src/lib/parsePrefs.ts`. Older saved answers (`food`, `hardNos`, `transport`, `freeFrom`/`freeUntil`) are folded into the four fields by `normalizePrefs`.
+
+### recap-image
+
+`POST /functions/v1/recap-image { group_id, plan_id? }` → `{ url, prompt }`. Paints the selected plan (or `plan_id`) with Grok Imagine (`GROK_IMAGE_MODEL`, default `grok-imagine-image-2.0`) and stores the URL on the group (or plan). Image URLs from xAI may be temporary.
 
 ## Deploy edge functions (Supabase CLI)
 
@@ -88,21 +117,18 @@ npx supabase login
 npx supabase link --project-ref oavxpwpdhdazhtieikju
 
 # Server secrets live ONLY in Supabase function secrets (never in .env files or the repo)
-npx supabase secrets set GROK_API_KEY=xai-... STRIPE_SECRET_KEY=sk_test_...
+npx supabase secrets set GROK_API_KEY=xai-...
 # optional: GROK_MODEL=grok-4.7  GROK_IMAGE_MODEL=grok-imagine-image-2.0
 
 npx supabase functions deploy make-plan   --no-verify-jwt
-npx supabase functions deploy pay         --no-verify-jwt
-npx supabase functions deploy recap-image --no-verify-jwt   # optional
 npx supabase functions deploy parse-prefs --no-verify-jwt
+npx supabase functions deploy recap-image --no-verify-jwt
 # No Docker? add --use-api
 ```
 
-`pay` refuses non-test Stripe keys. Without `STRIPE_SECRET_KEY` or a deployed `pay`, the app falls back to simulated payments (below). `SUPABASE_URL` and the service keys are injected automatically; don't set anything that starts with `SUPABASE_`. `--no-verify-jwt` is needed because `sb_publishable_` keys aren't JWTs (also set in `supabase/config.toml`); the functions check for the project's publishable key instead. That check is not auth, which is fine for a demo.
+`SUPABASE_URL` and the service keys are injected automatically; don't set anything that starts with `SUPABASE_`. `--no-verify-jwt` is needed because `sb_publishable_` keys aren't JWTs (also set in `supabase/config.toml`); the functions check for the project's publishable key instead. That check is not auth, which is fine for a demo.
 
-### parse-prefs (voice answers -> questionnaire)
-
-`POST /functions/v1/parse-prefs` with `{ transcript: string, current?: Partial<Preferences> }` returns `{ preferences: Partial<Preferences>, heard: string }`, with only the fields the person mentioned. `Preferences` lives in `supabase/functions/_shared/preferences.ts` (`budget` in max $ per person, `transport` one of `car | marta | rideshare | walk`, `freeFrom`/`freeUntil` as 24h `HH:MM`, plus `food`, `hardNos`, `other`). It uses the same `GROK_API_KEY` / `GROK_MODEL` secrets as make-plan; without a key, or if Grok fails, it returns a basic regex parse (dollar amount, transport and diet keywords, full transcript in `other`) instead of an error. Empty transcripts get a 400; transcripts are cut to 2000 chars. Client: `parsePrefs(transcript, current?)` in `src/lib/parsePrefs.ts`. Deploy: `npx supabase functions deploy parse-prefs --no-verify-jwt`.
+After editing `data/atlanta-activities.json`, run `./scripts/sync-shared.sh` and commit the regenerated `supabase/functions/_shared/catalog.ts`.
 
 Local function checks (Deno 2):
 
@@ -115,85 +141,28 @@ deno test --node-modules-dir=none supabase/functions/_shared/logic.test.ts
 
 ## Deploy web (Vercel)
 
-Import the repo → framework **Vite** → add `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_STRIPE_PUBLISHABLE_KEY` (optionally `VITE_SIMULATE_PAYMENTS=true` for a rehearsal deploy) → Deploy. `vercel.json` rewrites everything to `index.html`, so `/join/<code>` and `/g/<id>` deep links work.
+Import the repo → framework **Vite** → add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the `sb_publishable_` key) → Deploy. `vercel.json` rewrites everything to `index.html`, so `/join/<code>` and `/g/<id>` deep links work.
 
-## Branch workflow (3 people)
+## Branch workflow
 
-`main` stays demoable. Each person works on their own branch and opens small PRs into `main`. Pull `main` often.
-
-| Branch | Owner | Scope |
-| --- | --- | --- |
-| `backend-payments` | Person A | `supabase/` (functions, migrations), deploys, secrets, Stripe test flow end to end, RLS notes |
-| `frontend-screens` | Person B | `src/components/`, mobile polish, loading and empty states, confirmation screen |
-| `grok-voice-pitch` | Person C | `prompts/`, `data/`, `tools/prompt-tests/`, Grok Voice, recap image, pitch + demo rehearsal |
-
-```bash
-git checkout main && git pull
-git checkout -b frontend-screens
-# ...work...
-git add -A && git commit -m "Polish plan cards"
-git push -u origin frontend-screens   # then open a PR
-```
-
-Conflict hot spots: `GroupBoard.tsx` (A and B) and `supabase/functions/_shared/` (A and C). After editing `data/`, `schema/`, or `prompts/`, run `./scripts/sync-shared.sh` and commit the regenerated `_shared/*.ts`.
-
-**Voice:** 🎙 currently uses the browser's Web Speech API (Chrome/Edge). **TODO (SpaceXAI challenge):** swap it for Grok Voice / xAI speech-to-text (`dictate()` in `GroupBoard.tsx`). Don't block the demo on it.
-
-## Prompt tests
-
-```bash
-cd tools/prompt-tests
-python3 run.py --dry-run           # builds the exact make-plan request; no key, no network
-GROK_API_KEY=xai-... python3 run.py
-```
-
-## Stripe test cards
-
-> Old flow (unused).
-
-| Card | Result |
-| --- | --- |
-| `4242 4242 4242 4242` (Visa) | Hold succeeds (`requires_capture`). Use this one for the demo. |
-| `4000 0027 6000 3184` | 3-D Secure challenge |
-| `4000 0000 0000 9995` | Declined (insufficient funds) |
-
-Any future expiry, any CVC, any ZIP. Holds show as **Uncaptured** in Stripe Dashboard (test mode) → Payments.
-
-## Simulated payments (demo-safe fallback)
-
-> Old flow: payments are no longer part of the app. Kept for reference.
-
-Like the saved demo plan for Grok, "Lock & collect" has a fallback that needs no Stripe at all. It walks the same steps: each member places a hold capped at their budget, an over-cap member must tap "Approve anyway" first, the last approval captures everything, and "Cancel group" releases every hold. It uses the `pay` function's own rules (`decideHold`, `approvalCovers`, `captureReadiness` imported from `supabase/functions/_shared/logic.ts`). The card form becomes a single **Hold $X (simulated)** button, and the locked plan and confirmation show a **Simulated payment (test)** badge with the reason. No card is charged and nothing is sent to Stripe.
-
-| Mode | How to get it |
-| --- | --- |
-| **Real Stripe** (default when configured) | `VITE_STRIPE_PUBLISHABLE_KEY=pk_test_…` (a real key), `pay` deployed, `STRIPE_SECRET_KEY` set, `VITE_SIMULATE_PAYMENTS` unset or `false` |
-| **Forced simulation** (rehearsals) | `VITE_SIMULATE_PAYMENTS=true` in `.env.local` (or Vercel env), then restart `npm run dev` / redeploy. Badge reason: "Rehearsal mode" |
-| **Auto: Stripe not configured** | `VITE_STRIPE_PUBLISHABLE_KEY` missing or still the `pk_test_...` placeholder: simulates without calling `pay`. If the key is fine but `pay` isn't deployed or has no `STRIPE_SECRET_KEY`, the lock call fails and the group switches to simulated |
-| **Auto: Stripe call fails** | Any pay call that fails for infrastructure reasons (network, 5xx, Stripe API error, 401) switches the group to simulated and shows an amber notice with the error. Business-rule errors (400/404/409 such as "Group is cancelled") and card declines in the Stripe form are shown as before |
-
-How it syncs: simulated state lives in `members.constraints.sim_payment` plus the usual `members.approved*` and `groups.status` columns, so every phone follows along over the existing Realtime subscriptions. A group counts as simulated once any member has a `sim_payment` for the locked plan, so every phone in that group uses the simulated path whatever its own env says. If Stripe fails in the middle of a real flow, approvals are kept, holds that were already authorized carry over as placed, and the real test-mode holds are never captured (Stripe releases uncaptured test authorizations on its own). Generating new plans clears the simulated holds, the same way it clears rejections.
+`main` stays demoable. Everyone works on their own branch (one git worktree per branch works well) and opens small PRs into `main`. Pull `main` often. Conflict hot spots: `GroupBoard.tsx` and `supabase/functions/_shared/`.
 
 ## Demo script (2–3 min)
 
-> Written for the old chat + payments flow; needs a rewrite for lobby → questionnaire → vote.
+**0:00, the hook.** "Every friend group has this: nobody wants to say *I can only spend $35* or *I don't have a car* in front of everyone, so the plan ends up working for the loudest person. Quorum lets everyone answer privately, and Grok finds the plan that fits the whole group."
 
-**0:00, the hook (Meta: human connection).** "Every group chat has this: 40 messages, no plan, and one friend quietly can't afford the idea everyone's excited about. Quorum turns the chat into a plan that works for *everyone*, and nobody has to front the money."
+**0:20, QR lobby.** The creator makes "Saturday hang" and the lobby shows a big QR code. Two judges scan it with their phone camera, no app needed, join with just a name, and pop up in the member list live.
 
-**0:20, chat → Grok (SpaceXAI).** The organizer creates "Saturday hang" and shares the code. Two teammates join on their phones with caps ($30, $60). In the live chat: *"Maya: vegetarian + broke, $30 max · Jon: I can drive, free after 1 · Priya: nothing over 25, no car."* Tap 🎙 for a voice note. Tap **Generate Plan**. Point out that Grok extracted Priya's $25 cap from slang, noticed two people have no car, and used only real catalog venues. Show the per-member budget check ("Maya $18 / $30 ✓").
+**0:40, private answers.** Each phone fills the four fields: Budget, Dietary, Availability, Other (blank = no preference). For example: "$35, vegetarian, no car" · "$80, free after 5 PM Saturday, I have a car" · "$40, gluten-free, I take MARTA". Point out the 🔒 "Only Grok sees this" note: everyone else only sees a ✓ Ready checkmark. (Answering by voice with Grok Voice is in progress.)
 
-**0:55, live approve/reject (Meta).** Everyone approves or rejects from their own phone, and tallies update in real time. On the flagged "splurge" plan, Maya taps **Reject → Too expensive**. Every phone shows "Maya rejected the plan. Reason: too expensive." The organizer taps **Regenerate within everyone's cap**, and every new plan fits every cap. The server double-checks Grok's math ("Checked by server").
+**1:05, Grok plans.** The creator taps **Ask Grok**. Every phone shows the "Grok is working" card. 20-90 s later, 2-3 real Atlanta plans appear with venue pictures and a "why it fits" line that names nobody. Point out that every plan is under the lowest budget (the server re-checks Grok's math against the catalog prices), uses veg-friendly food, and only uses places reachable by MARTA, and that nothing reveals whose constraint was whose.
 
-**1:20, trusted payments (Visa: commerce + trust).** The organizer locks the winning plan. Each friend taps **Approve & hold my share** with Stripe's Visa test card 4242 4242 4242 4242. Every approval row, the split, and "Your plan" show the card as Visa •••• 4242. Explain that this is an **authorization hold, not a charge**. Show 2 uncaptured payments in the Stripe Dashboard. The last approval captures everything, and the screen shows **Booking confirmed 🎉**. Nobody Venmo-chases anyone.
+**1:40, vote.** Everyone taps **I'm in** on their favorite; counts update live on every phone. When everyone has voted, the top plan wins (the creator breaks ties).
 
-**1:50, edge cases.** In a second group, lock an over-cap plan. Maya sees *"This plan is $42, above your $30 cap. Approve anyway?"*, and nothing is held until she says yes. Then **Cancel group**: every hold is released.
+**2:00, winner poster and calendar.** Every phone flips to **Your plan**: a **Grok Imagine** poster of the day, the itinerary with times, **Add to calendar** (.ics) and Share. Close: "Everyone got a say, nobody had to overshare, and the plan actually fits."
 
-**2:15, the memory (SpaceXAI: Grok Imagine).** Tap **Make a recap card**. Close: "AI that plans *with* your friends, and money that moves only when everyone says yes."
-
-Judging hooks. **Meta:** real-world connection, with AI synthesizing the group discussion. **Visa:** GenAI from discovery to decision to budget personalization to secure checkout, with manual capture as the consent layer. **SpaceXAI:** Grok structured outputs, Grok Imagine, voice (upgrade to Grok Voice), and built with Cursor. The frame is *financial inclusion in social life*.
-
-**If Grok is down on stage:** Generate Plan falls back to saved plans for this exact conversation and shows a "saved demo plan" banner. **If Stripe is down or not set up:** Lock & collect falls back to simulated holds with a "Simulated payment (test)" badge (see "Simulated payments"). To rehearse without Stripe, set `VITE_SIMULATE_PAYMENTS=true`.
+**If Grok is slow or down on stage:** `make-plan` falls back to backup plans built from the same answers and rules, and if the function can't be reached at all, the app shows saved demo plans with a banner. A pre-made group with answers already in keeps the demo short.
 
 ## Security notes (demo)
 
-RLS is permissive so the demo works without login (see the header of `supabase/migrations/20260926000001_schema.sql`). The publishable key and Supabase URL are public by design. Never commit `sk_`, `xai-`, or service-role keys. Before real use: add Supabase Auth, tie members to `auth.uid()`, tighten policies, and add a Stripe webhook.
+RLS is permissive on `groups`, `members` and `plans` so the demo works without login (see the header of `supabase/migrations/20260926000001_schema.sql`); private answers are locked down as described above. The publishable key and Supabase URL are public by design. Never commit `xai-` or service-role keys. Before real use: add Supabase Auth, tie members to `auth.uid()` and tighten policies.
