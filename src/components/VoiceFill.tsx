@@ -4,6 +4,7 @@
 // Kept out of Questionnaire.tsx on purpose (that file is Kus's and is being translated), so it needs only
 // the current answers and the form's own applyPreferences.
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../i18n/hooks";
 import type { Preferences } from "../lib/prefs";
 import { parsePrefs } from "../lib/parsePrefs";
 import { voiceFillPatch } from "../lib/voiceFill";
@@ -18,6 +19,7 @@ const FIELDS = ["budget", "dietary", "availability", "other"] as const;
 type Field = (typeof FIELDS)[number];
 
 export function VoiceFill({ current, apply }: Props) {
+  const t = useT();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "info" | "err"; text: string } | null>(null);
@@ -55,14 +57,14 @@ export function VoiceFill({ current, apply }: Props) {
       const patch = voiceFillPatch(currentRef.current, await parsePrefs(said));
       const keys = FIELDS.filter((k) => patch[k] !== undefined);
       if (!keys.length) {
-        setMsg({ kind: "info", text: "Grok didn't hear a budget, diet, or time in that. Try again or type in the fields." });
+        setMsg({ kind: "info", text: t("voice.nothingHeard") });
         return;
       }
       apply(patch);
       setChanged(keys);
-      setMsg({ kind: "ok", text: "Filled by Grok — check and edit" });
+      setMsg({ kind: "ok", text: t("voice.filled") });
     } catch (e) {
-      setMsg({ kind: "err", text: `Grok couldn't read that (${e instanceof Error ? e.message : String(e)}). Type your answers below.` });
+      setMsg({ kind: "err", text: t("voice.readFailed", { error: e instanceof Error ? e.message : String(e) }) });
     } finally {
       setBusy(false);
     }
@@ -71,12 +73,12 @@ export function VoiceFill({ current, apply }: Props) {
   return (
     <div ref={box} className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3" data-voice-fill>
       <label className="block text-sm font-medium text-gray-800" htmlFor="voice-fill-text">
-        Tell Grok about yourself
+        {t("voice.title")}
       </label>
       <textarea
         id="voice-fill-text"
         className="h-16 w-full resize-none rounded-lg border border-gray-300 bg-white p-2 text-base"
-        placeholder="e.g. I'm vegetarian, about $40, free after 6, no bars"
+        placeholder={t("voice.placeholder")}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
@@ -88,7 +90,7 @@ export function VoiceFill({ current, apply }: Props) {
       />
       <div className="flex gap-2">
         <VoiceButton
-          idleLabel="🎙 Speak"
+          idleLabel={t("voice.speak")}
           disabled={busy}
           className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-700"
           onTranscript={async (heard) => {
@@ -104,7 +106,7 @@ export function VoiceFill({ current, apply }: Props) {
           onClick={() => void fill(text)}
           className="flex-1 rounded-xl bg-gray-900 px-4 py-2 font-semibold text-white disabled:opacity-50"
         >
-          {busy ? "Grok is reading…" : "Fill with Grok"}
+          {busy ? t("voice.reading") : t("voice.fill")}
         </button>
       </div>
       {msg && (

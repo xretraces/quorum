@@ -10,7 +10,7 @@ const utilBtn =
   "inline-flex h-8 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
 
 const utilBtnSolid =
-  "inline-flex h-8 items-center justify-center rounded-full text-spring-deep transition-colors hover:bg-spring/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-spring-deep/40";
+  "inline-flex h-8 items-center justify-center rounded-full text-navy transition-colors hover:bg-spring/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-spring-deep/40";
 
 function GlobeIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -76,8 +76,8 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
   const btn = tone === "onSpring" ? utilBtn : utilBtnSolid;
   const navCls =
     tone === "onSpring"
-      ? "flex items-center gap-0.5 rounded-full border border-white/40 bg-white/15 py-1 pl-1.5 pr-1 backdrop-blur-sm"
-      : "flex items-center gap-0.5 rounded-full border border-navy/15 bg-white/90 py-1 pl-1.5 pr-1 shadow-sm backdrop-blur-sm";
+      ? "flex items-center gap-0.5 rounded-full border border-white/40 bg-white/15 py-1 ps-1.5 pe-1 backdrop-blur-sm"
+      : "flex items-center gap-0.5 rounded-full border border-navy/15 bg-white/90 py-1 ps-1.5 pe-1 shadow-sm backdrop-blur-sm";
   const divider = tone === "onSpring" ? "h-5 w-px bg-white/30" : "h-5 w-px bg-navy/20";
 
   useEffect(() => {

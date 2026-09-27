@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n/hooks";
 import { isClosed } from "../lib/invite";
 import { claimMember } from "../lib/prefs";
+import { QuorumHeader } from "./QuorumHeader";
 import { type Group, myMemberId, setMyMemberId, supabase } from "../lib/supabase";
 
 type Load = "loading" | "ok" | "not-found" | "offline";
@@ -69,11 +70,14 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
     }[load];
     return (
       <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4 text-center">
+        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <QuorumHeader tone="onLight" />
+        </div>
         <p className="relative z-10 max-w-md text-gray-600">{msg}</p>
         {load === "offline" && (
-          <button onClick={fetchGroup} className="relative z-10 min-h-11 rounded-xl bg-spring-deep px-5 font-semibold text-white">{t("common.tryAgain")}</button>
+          <button onClick={fetchGroup} className="relative z-10 min-h-11 rounded-xl bg-navy px-5 font-semibold text-white">{t("common.tryAgain")}</button>
         )}
-        {load !== "loading" && <a href="/" className="relative z-10 inline-flex min-h-11 items-center text-spring-deep underline">{t("join.goHome")}</a>}
+        {load !== "loading" && <a href="/" className="relative z-10 inline-flex min-h-11 items-center text-navy underline">{t("join.goHome")}</a>}
       </div>
     );
   }
@@ -81,14 +85,17 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
   if (isClosed(group)) {
     return (
       <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
+        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <QuorumHeader tone="onLight" />
+        </div>
         <div className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 text-center shadow-lg ring-1 ring-spring/20">
           <p className="font-logo text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
           <h1 className="text-xl font-bold">{t("join.closedTitle", { group: group.name })}</h1>
           <p className="text-sm text-gray-600">{t("join.closedBody")}</p>
-          <button onClick={() => onJoined(group.id)} className="w-full rounded-xl bg-spring-deep p-3 font-semibold text-white hover:brightness-95">
+          <button onClick={() => onJoined(group.id)} className="w-full rounded-xl bg-navy p-3 font-semibold text-white hover:brightness-95">
             {t("join.seePlan")}
           </button>
-          <a href="/" className="inline-flex min-h-11 items-center text-sm text-spring-deep underline">{t("join.startOwn")}</a>
+          <a href="/" className="inline-flex min-h-11 items-center text-sm text-navy underline">{t("join.startOwn")}</a>
         </div>
       </div>
     );
@@ -96,6 +103,9 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
 
   return (
     <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
+      <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <QuorumHeader tone="onLight" />
+      </div>
       <form onSubmit={join} className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-spring/20">
         <p className="font-logo text-center text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
         <h1 className="text-xl font-bold text-gray-900">{t("join.title", { group: group.name })}</h1>
@@ -110,7 +120,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
           autoFocus
           required
         />
-        <button disabled={busy} className="w-full rounded-xl bg-spring-deep p-3 font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-50">
+        <button disabled={busy} className="w-full rounded-xl bg-navy p-3 font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-50">
           {busy ? t("join.joining") : t("join.join")}
         </button>
         <p className="text-center text-xs text-gray-500">

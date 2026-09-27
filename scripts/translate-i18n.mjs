@@ -2,6 +2,7 @@
 // Generates src/i18n/<lang>.json from src/i18n/en.json with Grok (xAI chat completions).
 //   XAI_API_KEY=... node scripts/translate-i18n.mjs            # every language
 //   XAI_API_KEY=... node scripts/translate-i18n.mjs es ar      # just these
+//   node scripts/translate-i18n.mjs --missing                  # only keys missing from each file (keeps the rest as is)
 // Model: the DEFAULT_MODEL in supabase/functions/make-plan/index.ts (override with GROK_MODEL).
 // Without XAI_API_KEY it falls back to the TEMPORARY `gen-assets` Supabase function (action "translate"), which calls
 // Grok with the project's GROK_API_KEY secret. It needs the token from GEN_ASSETS_TOKEN or ~/.gen-assets-token, plus
@@ -9,6 +10,7 @@
 // Every key and every {placeholder} must survive; bad output is retried, then the language fails loudly.
 // Keys and tokens are read from the environment/files only and are never printed or written anywhere.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+const ONLY_MISSING = process.argv.includes("--missing");
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -104,9 +106,21 @@ async function genAssetsCall(lang, strings) {
   return (await res.json())?.translations ?? {};
 }
 
+function existing(lang) {
+  const path = join(i18nDir, `${lang}.json`);
+  if (!ONLY_MISSING || !existsSync(path)) return {};
+  const old = JSON.parse(readFileSync(path, "utf8"));
+  // Keep only keys that still exist in en.json and still have the right placeholders.
+  return Object.fromEntries(keys.filter((k) => typeof old[k] === "string" && old[k].trim() && placeholders(old[k]) === placeholders(en[k])).map((k) => [k, old[k]]));
+}
+
 async function translateViaGenAssets(lang) {
-  const out = {};
-  let todo = en;
+  const out = existing(lang);
+  let todo = Object.fromEntries(keys.filter((k) => !(k in out)).map((k) => [k, en[k]]));
+  if (Object.keys(todo).length === 0) {
+    console.log(`${lang}: nothing missing`);
+    return;
+  }
   for (let attempt = 1; attempt <= 3; attempt++) {
     const got = await genAssetsCall(lang, todo);
     for (const k of Object.keys(todo)) if (typeof got[k] === "string") out[k] = got[k];
@@ -114,7 +128,7 @@ async function translateViaGenAssets(lang) {
     if (errs.length === 0) {
       const ordered = Object.fromEntries(keys.map((k) => [k, out[k]]));
       writeFileSync(join(i18nDir, `${lang}.json`), JSON.stringify(ordered, null, 2) + "\n");
-      console.log(`${lang}: ${keys.length} strings -> src/i18n/${lang}.json via gen-assets (attempt ${attempt})`);
+      console.log(`${lang}: ${Object.keys(todo).length} translated, ${keys.length} total -> src/i18n/${lang}.json via gen-assets (attempt ${attempt})`);
       return;
     }
     console.warn(`${lang}: attempt ${attempt} had ${errs.length} problem(s): ${errs.slice(0, 5).join("; ")}`);
@@ -155,7 +169,8 @@ async function translate(lang) {
     }
     const errs = problems(out);
     if (errs.length === 0) {
-      const ordered = Object.fromEntries(keys.map((k) => [k, out[k]]));
+      const keep = existing(lang);
+      const ordered = Object.fromEntries(keys.map((k) => [k, keep[k] ?? out[k]]));
       writeFileSync(join(i18nDir, `${lang}.json`), JSON.stringify(ordered, null, 2) + "\n");
       console.log(`${lang}: ${keys.length} strings -> src/i18n/${lang}.json (attempt ${attempt})`);
       return;
@@ -166,7 +181,7 @@ async function translate(lang) {
   throw new Error(`${lang}: still invalid after 3 attempts`);
 }
 
-const wanted = process.argv.slice(2);
+const wanted = process.argv.slice(2).filter((a) => !a.startsWith("--"));
 const langs = wanted.length ? wanted : Object.keys(LANGUAGES);
 for (const l of langs) if (!(l in LANGUAGES)) throw new Error(`Unknown language "${l}". Known: ${Object.keys(LANGUAGES).join(" ")}`);
 console.log(`Translating ${keys.length} strings into ${langs.join(", ")} ${genAssets ? "via the gen-assets function (no XAI_API_KEY)" : `with ${model}`}…`);

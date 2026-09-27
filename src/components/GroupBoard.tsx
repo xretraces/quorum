@@ -201,7 +201,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
           <QuorumHeader groupId={groupId} tone="onLight" />
         </div>
         <p className="relative z-10 text-gray-600">{err ?? (notFound ? t("board.groupNotFound") : t("common.loading"))}</p>
-        {(err || notFound) && <a href="/" onClick={home} className="relative z-10 text-spring-deep underline">{t("board.backHome")}</a>}
+        {(err || notFound) && <a href="/" onClick={home} className="relative z-10 text-navy underline">{t("board.backHome")}</a>}
       </div>
     );
   }
@@ -221,12 +221,12 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             href="/"
             onClick={home}
             aria-label={t("board.backAria")}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl text-spring-deep shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-navy shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
           >
             <span className="inline-block rtl:-scale-x-100">←</span>
           </a>
           <div className="min-w-0 flex-1">
-            <a href="/" onClick={home} className="font-logo block truncate text-xs font-semibold tracking-tight text-spring-deep lowercase">{t("board.homeLink")}</a>
+            <a href="/" onClick={home} className="font-logo block truncate text-xs font-semibold tracking-tight text-navy lowercase">{t("board.homeLink")}</a>
             <h1 dir="auto" className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{group.name}</h1>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium max-sm:px-2 max-sm:text-xs ${badge.cls}`}>{t(badge.labelKey)}</span>

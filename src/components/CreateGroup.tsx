@@ -66,7 +66,7 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
           <h1 className="font-logo mt-4 text-5xl font-semibold leading-[0.95] tracking-tight text-white sm:text-6xl">
             {t("landing.letsHang")}
           </h1>
-          <p className="mx-auto mt-5 max-w-sm text-base leading-relaxed text-white/90 sm:text-lg">
+          <p className="mx-auto mt-5 max-w-sm text-base leading-relaxed text-navy sm:text-lg">
             {t("landing.tagline")}
           </p>
         </header>
