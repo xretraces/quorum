@@ -1,5 +1,7 @@
 // In-app notifications for the current group, driven by Supabase Realtime (no push, no paid services).
 // Unread state is stored in localStorage keyed by groupId + memberId.
+// The first time a device sees a group (as viewer, new joiner or host), everything that already happened is marked
+// read: it still shows in the list as history, but only events that arrive after you got here count toward the badge.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Group, type Member, type Plan, myMemberId, supabase } from "./supabase";
 
@@ -19,10 +21,10 @@ export type GroupNotification = {
   key: string;
 };
 
-const READ_PREFIX = "pp:notif-read:";
 const META_PREFIX = "pp:notif-meta:";
 
-type Meta = { firstSeen: Record<string, number>; readKeys: string[] };
+// baselined: the backlog that existed on the first visit has been marked read.
+type Meta = { firstSeen: Record<string, number>; readKeys: string[]; baselined: boolean };
 
 function storageKey(groupId: string, memberId: string | null) {
   return `${META_PREFIX}${groupId}:${memberId ?? "anon"}`;
@@ -31,14 +33,16 @@ function storageKey(groupId: string, memberId: string | null) {
 function loadMeta(groupId: string, memberId: string | null): Meta {
   try {
     const raw = localStorage.getItem(storageKey(groupId, memberId));
-    if (!raw) return { firstSeen: {}, readKeys: [] };
-    const j = JSON.parse(raw) as Meta;
+    if (!raw) return { firstSeen: {}, readKeys: [], baselined: false };
+    const j = JSON.parse(raw) as Partial<Meta>;
     return {
       firstSeen: j.firstSeen && typeof j.firstSeen === "object" ? j.firstSeen : {},
       readKeys: Array.isArray(j.readKeys) ? j.readKeys : [],
+      // State saved by an older build means this device has been here before: keep its read state as is.
+      baselined: typeof j.baselined === "boolean" ? j.baselined : true,
     };
   } catch {
-    return { firstSeen: {}, readKeys: [] };
+    return { firstSeen: {}, readKeys: [], baselined: false };
   }
 }
 
@@ -49,7 +53,7 @@ function saveMeta(groupId: string, memberId: string | null, meta: Meta) {
     const keep = keys.sort((a, b) => (meta.firstSeen[b] ?? 0) - (meta.firstSeen[a] ?? 0)).slice(0, 200);
     const next: Record<string, number> = {};
     for (const k of keep) next[k] = meta.firstSeen[k];
-    meta = { firstSeen: next, readKeys: meta.readKeys.filter((k) => k in next).slice(-200) };
+    meta = { firstSeen: next, readKeys: meta.readKeys.filter((k) => k in next).slice(-200), baselined: meta.baselined };
   }
   localStorage.setItem(storageKey(groupId, memberId), JSON.stringify(meta));
 }
@@ -110,12 +114,15 @@ function derive(
   return items.slice(0, 40);
 }
 
+type Loaded = { key: string; group: Group | null; members: Member[]; plans: Plan[] };
+
 export function useGroupNotifications(groupId: string | null | undefined) {
   const meId = groupId ? myMemberId(groupId) : null;
-  const [group, setGroup] = useState<Group | null>(null);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const metaRef = useRef<Meta>({ firstSeen: {}, readKeys: [] });
+  const curKey = groupId ? storageKey(groupId, meId) : null;
+  // Data is tagged with the group+member it was loaded for, so a stale response (or the previous group's data right
+  // after navigating to another group) is never derived or baselined under the wrong key.
+  const [data, setData] = useState<Loaded | null>(null);
+  const metaRef = useRef<Meta>({ firstSeen: {}, readKeys: [], baselined: false });
   const metaKeyRef = useRef<string | null>(null);
   // Load the stored read/first-seen state synchronously for this group+member. Loading it in the effect (after the
   // first render) let the first render's saveMeta() overwrite it with an empty state, so every reload showed all
@@ -129,23 +136,16 @@ export function useGroupNotifications(groupId: string | null | undefined) {
     return metaRef.current;
   }, []);
   const [readKeys, setReadKeys] = useState<string[]>([]);
-  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     if (!groupId) {
-      setGroup(null);
-      setMembers([]);
-      setPlans([]);
+      setData(null);
       setReadKeys([]);
       return;
     }
+    const key = storageKey(groupId, meId);
     setReadKeys(metaFor(groupId, meId).readKeys);
-
-    // Migrate legacy read-at timestamp if present.
-    const legacy = localStorage.getItem(`${READ_PREFIX}${groupId}:${meId ?? "anon"}`);
-    if (legacy) {
-      /* keep for one release; ignore value — keys drive unread now */
-    }
+    let alive = true;
 
     const load = async () => {
       const [g, m, p] = await Promise.all([
@@ -153,10 +153,8 @@ export function useGroupNotifications(groupId: string | null | undefined) {
         supabase.from("members").select("*").eq("group_id", groupId).order("created_at"),
         supabase.from("plans").select("*").eq("group_id", groupId).order("option_index"),
       ]);
-      setGroup((g.data as Group) ?? null);
-      setMembers((m.data ?? []) as Member[]);
-      setPlans((p.data ?? []) as Plan[]);
-      setTick((t) => t + 1);
+      if (!alive) return;
+      setData({ key, group: (g.data as Group) ?? null, members: (m.data ?? []) as Member[], plans: (p.data ?? []) as Plan[] });
     };
     load();
 
@@ -168,28 +166,43 @@ export function useGroupNotifications(groupId: string | null | undefined) {
       .on("postgres_changes", { event: "*", schema: "public", table: "groups", filter: `id=eq.${groupId}` }, load)
       .subscribe();
     return () => {
+      alive = false;
       supabase.removeChannel(channel);
     };
   }, [groupId, meId, metaFor]);
 
-  const items = useMemo(() => {
-    if (!groupId) return [] as GroupNotification[];
-    const list = derive(group, members, plans, meId, metaFor(groupId, meId));
-    saveMeta(groupId, meId, metaRef.current);
-    return list;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, group, members, plans, meId, tick, metaFor]);
+  const loaded = !!groupId && !!data && data.key === curKey;
 
-  const readSet = useMemo(() => new Set(readKeys), [readKeys]);
+  const items = useMemo(() => {
+    if (!groupId || !loaded || !data) return [] as GroupNotification[];
+    const meta = metaFor(groupId, meId);
+    const list = derive(data.group, data.members, data.plans, meId, meta);
+    if (!meta.baselined) {
+      // First real load for this group on this device: what already happened is history, not news.
+      meta.readKeys = Array.from(new Set([...meta.readKeys, ...list.map((n) => n.key)]));
+      meta.baselined = true;
+    }
+    // Only saved once real data is in, so an empty first render can't store a baseline-less state.
+    saveMeta(groupId, meId, meta);
+    return list;
+  }, [groupId, meId, loaded, data, metaFor]);
+
+  // Read from the ref (the baseline above updates it during render); readKeys state just triggers re-renders.
+  const readSet = useMemo(
+    () => new Set(metaRef.current.readKeys),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, readKeys],
+  );
   const unread = useMemo(() => items.filter((n) => !readSet.has(n.key)).length, [items, readSet]);
 
   const markRead = useCallback(() => {
-    if (!groupId) return;
+    // Before the first load there is nothing to mark; replacing readKeys with [] here would un-read everything.
+    if (!groupId || !loaded) return;
     const keys = items.map((n) => n.key);
-    metaRef.current = { ...metaRef.current, readKeys: keys };
+    metaRef.current = { ...metaRef.current, readKeys: keys, baselined: true };
     saveMeta(groupId, meId, metaRef.current);
     setReadKeys(keys);
-  }, [groupId, meId, items]);
+  }, [groupId, meId, items, loaded]);
 
   return {
     items,
