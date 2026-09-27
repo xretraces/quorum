@@ -20,7 +20,7 @@ import { chooseTakeOutcome } from "../lib/voice-logic";
 const LIB_ERRORS: Record<string, string> = {
   "Could not read the recording.": "voice.readRecordingFailed",
   "Recording failed. Check the microphone and try again.": "voice.recordingFailed",
-  "Grok Voice isn't available, and this browser has no speech recognition (try Chrome).": "voice.noSpeechApi",
+  "Voice transcription isn't available, and this browser has no speech recognition (try Chrome).": "voice.noSpeechApi",
   "Voice recognition failed. Try again or type it.": "voice.recognitionFailed",
 };
 
