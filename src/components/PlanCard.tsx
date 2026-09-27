@@ -1,9 +1,9 @@
-// One plan option while voting: Grok Imagine picture, labels ("Fits everyone", "Cheapest"), estimated cost,
+// One plan option while voting: real photos of the stops (VenuePhotos), labels ("Fits everyone", "Cheapest"), estimated cost,
 // stops, Grok's group-level "why it fits" (never about one person), and "I'm in" with the live vote count.
 import type { Member, Plan } from "../lib/supabase";
 import { usd } from "../lib/supabase";
 import { DemoPlanPill, GrokSays } from "./Grok";
-import { Recap } from "./Recap";
+import { VenuePhotos } from "./VenuePhotos";
 
 type Props = {
   plan: Plan;
@@ -12,18 +12,17 @@ type Props = {
   memberCount: number;
   isMyVote: boolean;
   canVote: boolean;
-  painting: boolean;
   busy: boolean;
   onVote: () => void;
   /** Set for the creator on a tied plan: pick it as the winner. */
   onPick?: () => void;
 };
 
-export function PlanCard({ plan, labels, voters, memberCount, isMyVote, canVote, painting, busy, onVote, onPick }: Props) {
+export function PlanCard({ plan, labels, voters, memberCount, isMyVote, canVote, busy, onVote, onPick }: Props) {
   const notGrok = plan.model === "backup" || plan.model === "demo-fallback";
   return (
     <article className={`space-y-3 rounded-2xl bg-white p-3 shadow-md ${isMyVote ? "ring-2 ring-indigo-500" : ""}`}>
-      <Recap plan={plan} url={plan.recap_image_url} painting={painting} />
+      <VenuePhotos items={plan.items} />
 
       <div className="flex items-start justify-between gap-3 px-1">
         <div className="min-w-0">

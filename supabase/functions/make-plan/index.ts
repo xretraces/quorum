@@ -1,9 +1,12 @@
 // POST /functions/v1/make-plan  { group_id: string }
 // Builds 2-3 plans from the members' PRIVATE questionnaire answers (member_prefs, read with the service role),
 // not from chat. Grok (xAI chat completions, strict JSON schema, reasoning_effort "low") sees the answers
-// anonymized; the server re-checks every plan against the hard rules (budget cap, hard no's, transport, free
-// window) and drops failures. If Grok is unavailable or nothing it proposed survives, deterministic backup
+// anonymized; the server re-checks every plan against the hard rules (budget cap, hard no's, vegetarian and
+// gluten-free food, transport, free window, opening hours) and drops failures. If Grok is unavailable or nothing it proposed survives, deterministic backup
 // plans are built from the same answers (model "backup"). Replaces the group's plans and resets votes.
+// Grok gets at most GROK_BUDGET_MS in total (first attempt capped at GROK_FIRST_ATTEMPT_MS, the validation retry
+// only gets what is left), so a slow Grok falls back to backup plans at ~110s instead of hitting the Edge
+// Function wall-clock limit. The response carries `notice` when the backup plans had to ignore the free-time window.
 // Nothing written or returned names a member or reveals one person's answers.
 // Secrets: GROK_API_KEY (or XAI_API_KEY), optional GROK_MODEL.
 
@@ -23,17 +26,25 @@ import {
   PREFS_PLAN_SCHEMA,
   type PlanRow,
   readPrefs,
+  settleGlutenFree,
 } from "../_shared/prefsPlan.ts";
 import type { Preferences } from "../_shared/preferences.ts";
 
 const XAI_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_MODEL = "grok-4.7"; // override with the GROK_MODEL secret
+const GROK_FIRST_ATTEMPT_MS = 75_000;
+const GROK_BUDGET_MS = 110_000; // total across both attempts; leaves room under the 150s wall-clock limit
+const GROK_MIN_RETRY_MS = 5_000; // skip the retry if less than this is left
 const catalog = CATALOG_FILE.activities as unknown as CatalogEntry[];
 const requestSchema = schemaForRequest(PREFS_PLAN_SCHEMA as unknown as Record<string, unknown>, catalog.map((c) => c.id));
 
 async function callGrok(userPayload: unknown, model: string, apiKey: string): Promise<GrokPlan[]> {
   let lastErrors: string[] = [];
+  const started = Date.now();
   for (let attempt = 1; attempt <= 2; attempt++) {
+    const left = GROK_BUDGET_MS - (Date.now() - started);
+    if (attempt > 1 && left < GROK_MIN_RETRY_MS) break; // out of time: backup plans instead of a retry
+    const timeoutMs = attempt === 1 ? GROK_FIRST_ATTEMPT_MS : left;
     const messages: { role: string; content: string }[] = [
       { role: "system", content: PREFS_PLAN_PROMPT },
       { role: "user", content: JSON.stringify(userPayload) },
@@ -56,7 +67,7 @@ async function callGrok(userPayload: unknown, model: string, apiKey: string): Pr
           json_schema: { name: "quorum_plans", schema: requestSchema, strict: true },
         },
       }),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`xAI API error ${res.status}: ${(await res.text()).slice(0, 500)}`);
     const data = await res.json();
@@ -73,7 +84,7 @@ async function callGrok(userPayload: unknown, model: string, apiKey: string): Pr
     lastErrors = validateSchema(requestSchema, parsed);
     if (lastErrors.length === 0) return (parsed as { plans: GrokPlan[] }).plans;
   }
-  throw new Error(`Grok output failed validation after retry: ${lastErrors.slice(0, 5).join("; ")}`);
+  throw new Error(`Grok output failed validation (no time left or after retry): ${lastErrors.slice(0, 5).join("; ")}`);
 }
 
 async function planWithGrok(all: Preferences[], needs: GroupNeeds, names: string[]) {
@@ -119,10 +130,12 @@ Deno.serve(serveJson(async (body) => {
   const needed = Math.min(2, roster.length);
   if (all.length < Math.max(1, needed)) throw new HttpError(400, "Wait until at least 2 people have answered.");
 
-  const needs = groupNeeds(all, roster.length);
+  const needs = settleGlutenFree(groupNeeds(all, roster.length), catalog);
   const names = roster.map((m) => m.display_name);
   const fromGrok = await planWithGrok(all, needs, names);
-  const plans: PlanRow[] = fromGrok?.plans ?? backupPlans(catalog, needs);
+  const backup = fromGrok ? null : backupPlans(catalog, needs);
+  const plans: PlanRow[] = fromGrok?.plans ?? backup!.plans;
+  const notice = backup?.notice ?? null;
   const model = fromGrok?.model ?? "backup";
   if (plans.length === 0) {
     throw new HttpError(422, "Nothing in the catalog fits everyone's answers. Try loosening a budget or a hard no.");
@@ -160,5 +173,5 @@ Deno.serve(serveJson(async (body) => {
   const g = await db.from("groups").update({ status: "voting" }).eq("id", groupId);
   if (g.error) throw g.error;
 
-  return { plans: inserted, model, source: fromGrok ? "grok" : "backup", answered: all.length };
+  return { plans: inserted, model, source: fromGrok ? "grok" : "backup", answered: all.length, notice };
 }));

@@ -52,7 +52,7 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
 
   return (
     <div className="quorum-create relative flex min-h-dvh flex-col px-5 pt-[max(5.25rem,calc(env(safe-area-inset-top)+4.5rem))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-8">
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 pt-[max(1.15rem,env(safe-area-inset-top))] sm:px-8">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-between px-5 pt-[max(1.15rem,env(safe-area-inset-top))] sm:px-8">
         <p className="font-logo text-2xl font-semibold tracking-tight text-white lowercase sm:text-3xl">
           quorum
         </p>
@@ -92,7 +92,7 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
             Let’s hang.
           </h1>
           <p className="mx-auto mt-5 max-w-sm text-base leading-relaxed text-white/90 sm:text-lg">
-            Everyone answers privately. Quorum finds a plan that works for everyone.
+            Everyone answers privately. Grok finds a plan that works for everyone.
           </p>
         </header>
 
