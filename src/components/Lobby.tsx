@@ -4,7 +4,8 @@
 // the creator always keeps the QR code at the top.
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
-import { useT } from "../i18n/hooks";
+import { iso } from "../i18n/bidi";
+import { useT, useTNodes } from "../i18n/hooks";
 import { avatarColor, initials } from "../lib/booking";
 import { copyText, inviteUrl as inviteUrlFor } from "../lib/invite";
 import type { Group, Member } from "../lib/supabase";
@@ -23,6 +24,7 @@ type Props = {
 
 export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswers }: Props) {
   const t = useT();
+  const tNodes = useTNodes();
   const [note, setNote] = useState<string | null>(null);
   const inviteUrl = inviteUrlFor(group.invite_code); // always the live site, even from localhost
   const ready = members.filter((m) => m.prefs_ready).length;
@@ -110,10 +112,12 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${avatarColor(m.display_name)}`}>
                 {initials(m.display_name)}
               </span>
-              <span className="min-w-0 flex-1 truncate font-medium text-gray-900">
-                <bdi>{m.display_name}</bdi>
-                {m.is_organizer && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.creatorTag")}</span>}
-                {m.id === me?.id && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.youTag")}</span>}
+              {/* The name truncates inside its own <bdi>, so a long Latin name in Arabic keeps its start and ends in "…"
+                  (truncating the whole RTL row cut the name's first letters), and the creator / you tags stay visible. */}
+              <span className="flex min-w-0 flex-1 items-baseline font-medium text-gray-900">
+                <bdi className="min-w-0 truncate">{m.display_name}</bdi>
+                {m.is_organizer && <span className="ms-1 shrink-0 text-xs font-normal text-gray-500">{t("lobby.creatorTag")}</span>}
+                {m.id === me?.id && <span className="ms-1 shrink-0 text-xs font-normal text-gray-500">{t("lobby.youTag")}</span>}
               </span>
               {m.prefs_ready ? (
                 <span className="flex items-center gap-1 text-sm font-semibold text-emerald-600">
@@ -153,7 +157,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
       ) : (
         me && (
           <p className="text-center text-sm text-gray-500">
-            {t(allReady ? "lobby.waitingAllReady" : "lobby.waiting", { name: members.find((m) => m.is_organizer)?.display_name ?? t("common.theCreator") })}
+            {tNodes(allReady ? "lobby.waitingAllReady" : "lobby.waiting", { name: iso(members.find((m) => m.is_organizer)?.display_name ?? t("common.theCreator")) })}
           </p>
         )
       )}

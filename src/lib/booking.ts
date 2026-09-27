@@ -144,8 +144,13 @@ export function dietNotesFor(m: Member, plan: Plan): { stop: string; note: strin
   });
 }
 
-export const initials = (name: string) =>
-  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
+/** Avatar initials from the first letters/digits of up to two words. Code-point safe: "Nour 🌙✨" -> "N" (it used to
+ *  take half of the emoji's surrogate pair and render "N�"); an emoji-only name uses its first emoji. */
+export const initials = (name: string) => {
+  const words = name.split(/\s+/).filter((w) => /^[\p{L}\p{N}]/u.test(w));
+  const out = words.slice(0, 2).map((w) => Array.from(w)[0]!.toUpperCase()).join("");
+  return out || Array.from(name.trim())[0] || "?";
+};
 
 const AVATAR_COLORS = ["bg-indigo-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-sky-500", "bg-violet-500"];
 export function avatarColor(name: string) {

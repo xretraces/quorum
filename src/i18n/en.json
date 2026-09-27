@@ -7,6 +7,7 @@
   "common.theCreator": "the creator",
   "common.theCreatorStart": "The creator",
   "common.share": "Share",
+  "common.listSep": ", ",
   "status.planning": "Lobby",
   "status.voting": "Voting",
   "status.decided": "Decided",

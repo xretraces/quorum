@@ -7,6 +7,7 @@
   "common.theCreator": "el creador",
   "common.theCreatorStart": "El creador",
   "common.share": "Compartir",
+  "common.listSep": ", ",
   "status.planning": "Sala",
   "status.voting": "Votación",
   "status.decided": "Decidido",

@@ -66,7 +66,7 @@ export function FinalPlan({ group, plan: original, members, painting, onMakePost
     <section className="space-y-4">
       <div className="rounded-2xl bg-emerald-600 p-4 text-white shadow-md">
         <p className="text-xs font-semibold uppercase tracking-wide text-emerald-100">{t("final.yourPlan")}</p>
-        <h2 className={`mt-1 text-2xl font-bold leading-tight ${pending ? "motion-safe:animate-pulse" : ""}`}>{plan.title}</h2>
+        <h2 className={`mt-1 text-2xl font-bold leading-tight ${pending ? "motion-safe:animate-pulse" : ""}`}><bdi>{plan.title}</bdi></h2>
         <p className="mt-1 text-sm text-emerald-50">
           {t("final.votesLine", { votes, total: members.length, price: usd(plan.per_person_cents) })}
         </p>
@@ -93,7 +93,7 @@ export function FinalPlan({ group, plan: original, members, painting, onMakePost
                 <div className="min-w-0 flex-1 pb-4">
                   <p className="font-semibold text-gray-900"><bdi>{it.name}</bdi></p>
                   {c && <p className="text-xs text-gray-500">{c.neighborhood}{c.duration_minutes ? t("final.aboutMinutes", { minutes: c.duration_minutes }) : ""}</p>}
-                  {it.note && <p className={`text-xs text-gray-500 ${shimmer}`}>{it.note}</p>}
+                  {it.note && <p className={`text-xs text-gray-500 ${shimmer}`}><bdi>{it.note}</bdi></p>}
                   {transitNotes[i] && <p className={`mt-0.5 text-xs text-gray-400 ${shimmer}`}>🚇 {transitNotes[i]}</p>}
                 </div>
               </li>
@@ -103,7 +103,7 @@ export function FinalPlan({ group, plan: original, members, painting, onMakePost
 
         {plan.why_it_works && (
           <GrokSays label={t("plan.whyItFits")} className="rounded-xl bg-indigo-50 p-3">
-            <span className={shimmer}>{plan.why_it_works}</span>
+            <bdi className={shimmer}>{plan.why_it_works}</bdi>
           </GrokSays>
         )}
       </div>

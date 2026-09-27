@@ -1,6 +1,7 @@
 // "Grok is working" card shown to every member while make-plan runs (up to about a minute). Steps advance on a timer from
 // the shared start time; when the response arrives the remaining steps tick off quickly, then onDone hides it.
 import { useEffect, useRef, useState } from "react";
+import { iso } from "../i18n/bidi";
 import { useT, useTNodes } from "../i18n/hooks";
 import type { GrokRun } from "../lib/grokRun";
 import { DemoPlanPill, GrokAvatar, GrokSays } from "./Grok";
@@ -74,7 +75,7 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
           </span>
         )}
       </p>
-      {!isMine && !allDone && <p className="-mt-2 text-xs text-gray-500">{t("working.askedBy", { name: run.by })}</p>}
+      {!isMine && !allDone && <p className="-mt-2 text-xs text-gray-500">{tNodes("working.askedBy", { name: iso(run.by) })}</p>}
 
       <ol className="space-y-2.5">
         {STEPS.map((label, i) => {

@@ -3,7 +3,8 @@
 import type { Member, Plan } from "../lib/supabase";
 import { usd } from "../lib/supabase";
 import { localStart } from "../i18n/format";
-import { useLanguage, useT } from "../i18n/hooks";
+import { isoList } from "../i18n/bidi";
+import { useLanguage, useT, useTNodes } from "../i18n/hooks";
 import { usePlanTranslation } from "../i18n/usePlanTranslation";
 import { DemoPlanPill, GrokSays } from "./Grok";
 import { VenuePhotos } from "./VenuePhotos";
@@ -23,6 +24,7 @@ type Props = {
 
 export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote, canVote, busy, onVote, onPick }: Props) {
   const t = useT();
+  const tNodes = useTNodes();
   const { lang } = useLanguage();
   const { plan, pending } = usePlanTranslation(original);
   const shimmer = pending ? "shimmer-text" : "";
@@ -40,7 +42,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
               ))}
             </div>
           )}
-          <h3 className={`text-lg font-bold leading-tight text-gray-900 ${shimmer}`}>{plan.title}</h3>
+          <h3 className={`text-lg font-bold leading-tight text-gray-900 ${shimmer}`}><bdi>{plan.title}</bdi></h3>
         </div>
         <div className="shrink-0 text-end">
           <div className="text-xl font-bold text-indigo-600">{usd(plan.per_person_cents)}</div>
@@ -54,7 +56,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
             <span className="w-[4.5rem] shrink-0 text-gray-500">{localStart(it.start_time, lang).time}</span>
             <span className="min-w-0">
               <bdi className="font-medium text-gray-900">{it.name}</bdi>
-              {it.note && <span className={`block text-xs text-gray-500 ${shimmer}`}>{it.note}</span>}
+              {it.note && <bdi className={`block text-xs text-gray-500 ${shimmer}`}>{it.note}</bdi>}
             </span>
           </li>
         ))}
@@ -62,7 +64,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
 
       {plan.why_it_works && (
         <GrokSays label={t("plan.whyItFits")} tag={notGrok && <DemoPlanPill backup={plan.model === "backup"} />} className="rounded-xl bg-indigo-50 p-3">
-          <span className={shimmer}>{plan.why_it_works}</span>
+          <bdi className={shimmer}>{plan.why_it_works}</bdi>
         </GrokSays>
       )}
 
@@ -80,7 +82,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
           {voters.length}/{memberCount}
         </span>
       </div>
-      {voters.length > 0 && <p className="px-1 text-xs text-gray-500">{t("plan.votersIn", { names: voters.map((v) => v.display_name).join(", ") })}</p>}
+      {voters.length > 0 && <p className="px-1 text-xs text-gray-500">{tNodes("plan.votersIn", { names: isoList(voters.map((v) => v.display_name), t("common.listSep")) })}</p>}
       {onPick && (
         <button
           disabled={busy}

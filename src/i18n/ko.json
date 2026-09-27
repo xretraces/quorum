@@ -7,6 +7,7 @@
   "common.theCreator": "만든 사람",
   "common.theCreatorStart": "만든 사람",
   "common.share": "공유",
+  "common.listSep": ", ",
   "status.planning": "대기실",
   "status.voting": "투표 중",
   "status.decided": "결정됨",
