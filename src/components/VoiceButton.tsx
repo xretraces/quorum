@@ -3,6 +3,7 @@
 // If that fails, we use the browser transcript from the same take when we have one (laptops),
 // otherwise an infra failure starts browser STT automatically (no extra tap).
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../i18n/hooks";
 import {
   browserDictate,
   canRecordAudio,
@@ -14,6 +15,14 @@ import {
   type VoiceSource,
 } from "../lib/voice";
 import { chooseTakeOutcome } from "../lib/voice-logic";
+
+// Errors thrown with fixed English text by lib/voice.ts, shown translated.
+const LIB_ERRORS: Record<string, string> = {
+  "Could not read the recording.": "voice.readRecordingFailed",
+  "Recording failed. Check the microphone and try again.": "voice.recordingFailed",
+  "Grok Voice isn't available, and this browser has no speech recognition (try Chrome).": "voice.noSpeechApi",
+  "Voice recognition failed. Try again or type it.": "voice.recognitionFailed",
+};
 
 type Phase = "idle" | "starting" | "recording" | "listening" | "transcribing";
 
@@ -32,10 +41,11 @@ export function VoiceButton({
   extraKeyterms = [],
   disabled,
   className,
-  idleLabel = "🎙 Voice",
+  idleLabel,
   onError,
   onInfo,
 }: Props) {
+  const t = useT();
   const [phase, setPhase] = useState<Phase>("idle");
   const [elapsed, setElapsed] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -60,7 +70,7 @@ export function VoiceButton({
   async function deliver(text: string, source: VoiceSource) {
     if (!mountedRef.current) return;
     const trimmed = text.trim();
-    if (!trimmed) throw new Error("I didn't catch that. Try again or type it.");
+    if (!trimmed) throw new Error(t("voice.didntCatch"));
     await onTranscript(trimmed, source);
   }
 
@@ -96,7 +106,7 @@ export function VoiceButton({
     if (!signal.aborted) abortRef.current?.abort();
     const browserText = (await browserP).trim();
     if (!mountedRef.current) return;
-    if (blob.size < 800 && !browserText) throw new Error("I didn't catch that. Tap Voice and speak a bit longer.");
+    if (blob.size < 800 && !browserText) throw new Error(t("voice.tooShort"));
     if (blob.size < 800 && browserText) {
       await deliver(browserText, "browser");
       return;
@@ -113,18 +123,18 @@ export function VoiceButton({
 
     const infra = grokErr !== null && grokVoiceUnavailable(grokErr);
     if (infra) preferBrowser.current = true;
-    const why = grokErr ? (grokErr instanceof Error ? grokErr.message : String(grokErr)) : "it heard silence";
+    const why = grokErr ? (grokErr instanceof Error ? grokErr.message : String(grokErr)) : t("voice.heardSilence");
     const outcome = chooseTakeOutcome({ grokText, grokFailed: grokErr !== null, infra, browserText });
     switch (outcome.kind) {
       case "grok":
         await deliver(outcome.text, "grok");
         return;
       case "browser":
-        onInfo?.(`Grok Voice couldn't transcribe this take (${why}). Using the browser transcript instead.`);
+        onInfo?.(t("voice.usingBrowser", { why }));
         await deliver(outcome.text, "browser");
         return;
       case "relisten": {
-        onInfo?.(`Grok Voice is unavailable (${why}). Listening with the browser — speak again.`);
+        onInfo?.(t("voice.relisten", { why }));
         const ac = new AbortController();
         abortRef.current = ac;
         setPhase("starting");
@@ -132,7 +142,7 @@ export function VoiceButton({
         return;
       }
       case "error":
-        throw grokErr ?? new Error("Grok Voice heard silence. Try again.");
+        throw grokErr ?? new Error(t("voice.silence"));
     }
   }
 
@@ -154,11 +164,12 @@ export function VoiceButton({
       if (!mountedRef.current) return;
       const name = e instanceof DOMException ? e.name : "";
       if (name === "NotAllowedError") {
-        onError?.("Microphone permission denied. Allow the mic in the browser, or type it.");
+        onError?.(t("voice.micDenied"));
       } else if (name === "NotFoundError") {
-        onError?.("No microphone found. Plug one in, or type it.");
+        onError?.(t("voice.noMic"));
       } else {
-        onError?.(e instanceof Error ? e.message : String(e));
+        const msg = e instanceof Error ? e.message : String(e);
+        onError?.(LIB_ERRORS[msg] ? t(LIB_ERRORS[msg]) : msg);
       }
     } finally {
       abortRef.current = null;
@@ -172,12 +183,12 @@ export function VoiceButton({
   const live = phase === "recording" || phase === "listening";
   const label =
     phase === "starting"
-      ? "Starting mic…"
+      ? t("voice.starting")
       : live
-        ? `● Stop${elapsed > 0 ? ` ${elapsed}s` : ""}`
+        ? elapsed > 0 ? t("voice.stopSeconds", { seconds: elapsed }) : t("voice.stop")
         : phase === "transcribing"
-          ? "Grok is listening…"
-          : idleLabel;
+          ? t("voice.listening")
+          : idleLabel ?? t("voice.voice");
   const locked = phase === "transcribing" || phase === "starting";
 
   return (
@@ -187,10 +198,10 @@ export function VoiceButton({
       disabled={disabled || locked}
       title={
         live
-          ? `Tap Stop to send (max ${MAX_RECORD_MS / 1000}s). Auto-stops after a long pause.`
+          ? t("voice.hintLive", { seconds: MAX_RECORD_MS / 1000 })
           : phase === "starting"
-            ? "Waiting for the microphone…"
-            : "Speak your budget and preferences. Grok Voice transcribes it."
+            ? t("voice.hintStarting")
+            : t("voice.hintIdle")
       }
       className={`${className ?? "rounded-xl border border-gray-300 px-4 py-3 text-gray-700 transition-colors hover:bg-gray-50"} disabled:opacity-50 ${
         live ? "border-red-300 bg-red-50 font-semibold text-red-700 hover:bg-red-50" : ""

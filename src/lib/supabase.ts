@@ -18,7 +18,7 @@ export class InvokeError extends Error {
 }
 
 /** Calls an Edge Function and surfaces its JSON `{ error }` message on failure. */
-export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay" | "recap-image" | "parse-prefs", body: unknown): Promise<T> {
+export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay" | "recap-image" | "parse-prefs" | "translate-plan", body: unknown): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body: body as Record<string, unknown> });
   if (error) {
     let msg = error.message;
@@ -47,7 +47,7 @@ export const myGroupIds = () =>
   Object.keys(localStorage).filter((k) => k.startsWith(MEMBER_KEY)).map((k) => k.slice(MEMBER_KEY.length));
 export const forgetGroup = (groupId: string) => localStorage.removeItem(`${MEMBER_KEY}${groupId}`);
 
-const STATUS: Record<string, { label: string; cls: string }> = {
+const STATUS: Record<string, { label: string; cls: string }> = { // UI shows t(`status.${status}`) (src/i18n)
   planning: { label: "Lobby", cls: "bg-sky-100 text-sky-700" },
   voting: { label: "Voting", cls: "bg-amber-100 text-amber-700" },
   decided: { label: "Decided", cls: "bg-emerald-100 text-emerald-700" },
@@ -57,7 +57,10 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Cancelled", cls: "bg-gray-100 text-gray-600" },
 };
 /** User-facing label + Tailwind colors for groups.status. */
-export const statusBadge = (status: string) => STATUS[status] ?? { label: status, cls: "bg-gray-100 text-gray-600" };
+export const statusBadge = (status: string) => ({
+  ...(STATUS[status] ?? { label: status, cls: "bg-gray-100 text-gray-600" }),
+  labelKey: `status.${status}`,
+});
 
 export const usd = (cents: number | null | undefined) =>
   cents === null || cents === undefined ? "n/a" : `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
@@ -116,6 +119,13 @@ export type Plan = {
   model?: string | null;
   /** Grok Imagine picture of this plan (recap-image with plan_id). */
   recap_image_url?: string | null;
+  /** Cached Grok translations of the text fields, by language (translate-plan). Venue names are never translated. */
+  translations?: Record<string, PlanTranslation> | null;
   created_at?: string;
+};
+/** Translated text of a plan. `items` lines up with plan.items by index. */
+export type PlanTranslation = {
+  title: string; summary: string; why_it_works: string;
+  items: { note: string; transit_note: string }[];
 };
 export type Payment = { id: string; member_id: string; plan_id: string; amount_cents: number; status: string; over_cap_reapproved: boolean };

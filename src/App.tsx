@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CreateGroup } from "./components/CreateGroup";
 import { JoinGroup } from "./components/JoinGroup";
 import { GroupBoard } from "./components/GroupBoard";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 
 export default function App() {
   const [path, setPath] = useState(window.location.pathname);
@@ -26,6 +27,8 @@ export default function App() {
 
   return (
     <>
+      {/* Home has its own language button (the "EN" pill in CreateGroup's header). */}
+      {(board || join) && <LanguageSwitcher />}
       {board ? (
         <GroupBoard groupId={board[1]} onHome={() => go("/")} />
       ) : join ? (
