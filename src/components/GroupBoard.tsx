@@ -1,6 +1,6 @@
 // Group board: lobby (QR invite, live members + ready checks, private questionnaire) -> the creator asks Grok
 // (make-plan reads everyone's private answers server-side) with the shared "Grok is working" steps -> plan cards
-// with Grok Imagine pictures and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
+// with real venue photos and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
 // breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildFallbackPlans } from "../lib/fallback";
@@ -11,8 +11,6 @@ import { FinalPlan } from "./FinalPlan";
 import { GrokWorking } from "./GrokWorking";
 import { Lobby } from "./Lobby";
 import { PlanCard } from "./PlanCard";
-
-const PAINT_WINDOW_MS = 2 * 60_000; // other phones show "painting" this long after plans appear
 
 /** Live tally: the winner once every member has voted and one plan has the most votes. */
 function tally(plans: Plan[], members: Member[]) {
@@ -107,7 +105,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       }));
   }, [groupId]);
 
-  // Winner without a picture (per-plan pictures failed or recap-image isn't redeployed): the creator asks once.
+  // Grok Imagine only paints the WINNING plan's poster (plan cards show real venue photos): the creator asks once.
   useEffect(() => {
     if (!winner || !me?.is_organizer || winner.recap_image_url || group?.recap_image_url) return;
     if (painting.has(winner.id) || finalRecapAsked.current === winner.id) return;
@@ -154,21 +152,18 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     setMyRun(started);
     announce(started);
     try {
-      let fresh: Plan[];
       try {
         const res = await invoke<{ plans: Plan[]; source: "grok" | "backup" }>("make-plan", { group_id: groupId });
-        fresh = res.plans ?? [];
         finishRun(res.source === "backup" ? "backup" : "grok");
       } catch (e) {
         // A deliberate refusal (not enough answers, nothing fits, already decided) is shown as is.
         if (e instanceof InvokeError && e.fromFunction && e.status !== undefined && [400, 404, 409, 422].includes(e.status)) throw e;
         console.error("make-plan failed, using saved demo plans", e);
-        fresh = await applyFallback();
+        await applyFallback();
         finishRun("demo");
         setInfo(`Grok couldn't be reached (${e instanceof Error ? e.message : String(e)}). Showing saved demo plans.`);
       }
-      await load();
-      fresh.filter((p) => !p.recap_image_url).forEach((p) => paint(p.id));
+      await load(); // no per-plan Grok Imagine calls any more: cards use venue photos
     } catch (e) {
       finishRun(null);
       setErr(`We couldn't make plans right now. ${e instanceof Error ? e.message : String(e)}`);
@@ -204,8 +199,6 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   }
 
   const organizer = members.find((m) => m.is_organizer);
-  const recentlyMade = (p: Plan) => !!p.created_at && Date.now() - new Date(p.created_at).getTime() < PAINT_WINDOW_MS;
-  const isPainting = (p: Plan) => painting.has(p.id) || (!p.recap_image_url && recentlyMade(p));
   const stage = grokRun ? "grok" : winner ? "final" : plans.length ? "vote" : "lobby";
   const badge = winner ? statusBadge("decided") : statusBadge(group.status);
 
@@ -270,7 +263,6 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
                 memberCount={members.length}
                 isMyVote={me?.vote_plan_id === p.id}
                 canVote={!!me}
-                painting={isPainting(p)}
                 busy={!!busy}
                 onVote={() => vote(p.id)}
                 onPick={me?.is_organizer && tied.some((t) => t.id === p.id) ? () => pick(p.id) : undefined}

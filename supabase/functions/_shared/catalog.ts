@@ -4,6 +4,7 @@ export const CATALOG_FILE = {
   "version": "2026-09-26",
   "city": "Atlanta, GA",
   "currency": "usd",
+  "photos_note": "photo = 800px JPG in public/venues/ from Wikimedia Commons (free licenses only); photoCredit = author, license, Commons file page. Venues without a free photo get a gradient placeholder in the UI.",
   "activities": [
     {
       "id": "ponce-city-market-food-hall",
@@ -20,7 +21,13 @@ export const CATALOG_FILE = {
         "food-hall",
         "variety",
         "indoor"
-      ]
+      ],
+      "photo": "/venues/ponce-city-market-food-hall.jpg",
+      "photoCredit": {
+        "author": "Keizers",
+        "license": "CC BY-SA 3.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Ponce_City_Market_1.JPG"
+      }
     },
     {
       "id": "skyline-park-pcm",
@@ -37,7 +44,13 @@ export const CATALOG_FILE = {
         "rooftop",
         "games",
         "views"
-      ]
+      ],
+      "photo": "/venues/skyline-park-pcm.jpg",
+      "photoCredit": {
+        "author": "JJonahJackalope",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Ponce_City_Market,_Atlanta.jpg"
+      }
     },
     {
       "id": "beltline-eastside-trail",
@@ -54,7 +67,13 @@ export const CATALOG_FILE = {
         "free",
         "walk",
         "street-art"
-      ]
+      ],
+      "photo": "/venues/beltline-eastside-trail.jpg",
+      "photoCredit": {
+        "author": "John Phelan",
+        "license": "CC BY 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Atlanta_Beltline_Eastside_Trail,_Inman_Park_GA.jpg"
+      }
     },
     {
       "id": "krog-street-market",
@@ -71,7 +90,13 @@ export const CATALOG_FILE = {
         "food-hall",
         "variety",
         "indoor"
-      ]
+      ],
+      "photo": "/venues/krog-street-market.jpg",
+      "photoCredit": {
+        "author": "LittleT889",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Krog_Street_Market.jpg"
+      }
     },
     {
       "id": "georgia-aquarium",
@@ -87,7 +112,13 @@ export const CATALOG_FILE = {
       "tags": [
         "indoor",
         "iconic"
-      ]
+      ],
+      "photo": "/venues/georgia-aquarium.jpg",
+      "photoCredit": {
+        "author": "Zac Wolf",
+        "license": "CC BY-SA 2.5",
+        "source": "https://commons.wikimedia.org/wiki/File:Male_whale_shark_at_Georgia_Aquarium.jpg"
+      }
     },
     {
       "id": "world-of-coca-cola",
@@ -104,7 +135,13 @@ export const CATALOG_FILE = {
         "indoor",
         "iconic",
         "tasting"
-      ]
+      ],
+      "photo": "/venues/world-of-coca-cola.jpg",
+      "photoCredit": {
+        "author": "Marco Correa",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:World_of_Coca_Cola_2015-04-09.jpg"
+      }
     },
     {
       "id": "center-civil-human-rights",
@@ -121,7 +158,13 @@ export const CATALOG_FILE = {
         "indoor",
         "history",
         "meaningful"
-      ]
+      ],
+      "photo": "/venues/center-civil-human-rights.jpg",
+      "photoCredit": {
+        "author": "Marco Correa",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:National_Center_for_Civil_and_Human_Rights_01.jpg"
+      }
     },
     {
       "id": "mlk-national-historical-park",
@@ -138,7 +181,13 @@ export const CATALOG_FILE = {
         "free",
         "history",
         "meaningful"
-      ]
+      ],
+      "photo": "/venues/mlk-national-historical-park.jpg",
+      "photoCredit": {
+        "author": "Schatzim",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Ebenezer_Baptist_Church_-_Atlanta_Georgia_-_Sign.jpg"
+      }
     },
     {
       "id": "sweet-auburn-curb-market",
@@ -155,7 +204,13 @@ export const CATALOG_FILE = {
         "food-hall",
         "budget",
         "local"
-      ]
+      ],
+      "photo": "/venues/sweet-auburn-curb-market.jpg",
+      "photoCredit": {
+        "author": "Warren LeMay",
+        "license": "CC0",
+        "source": "https://commons.wikimedia.org/wiki/File:Atlanta_Municipal_Market,_Atlanta,_GA_(40508645753).jpg"
+      }
     },
     {
       "id": "high-museum-of-art",
@@ -171,7 +226,13 @@ export const CATALOG_FILE = {
       "tags": [
         "indoor",
         "art"
-      ]
+      ],
+      "photo": "/venues/high-museum-of-art.jpg",
+      "photoCredit": {
+        "author": "Marc Merlin",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:High_Museum_of_Art,_Meier_Building.jpg"
+      }
     },
     {
       "id": "atlanta-botanical-garden",
@@ -187,7 +248,13 @@ export const CATALOG_FILE = {
       "tags": [
         "outdoors",
         "gardens"
-      ]
+      ],
+      "photo": "/venues/atlanta-botanical-garden.jpg",
+      "photoCredit": {
+        "author": "Daderot",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Dorothy_Chapman_Fuqua_Conservatory_-_Atlanta_Botanical_Garden,_Atlanta,_GA.JPG"
+      }
     },
     {
       "id": "piedmont-park",
@@ -204,7 +271,13 @@ export const CATALOG_FILE = {
         "free",
         "outdoors",
         "picnic"
-      ]
+      ],
+      "photo": "/venues/piedmont-park.jpg",
+      "photoCredit": {
+        "author": "EternalAhsoka",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Piedmont_Park_Atlanta.jpg"
+      }
     },
     {
       "id": "mary-macs-tea-room",
@@ -221,7 +294,13 @@ export const CATALOG_FILE = {
         "southern",
         "classic"
       ],
-      "dietary_note": "Vegetable-sides plate available"
+      "dietary_note": "Vegetable-sides plate available",
+      "photo": "/venues/mary-macs-tea-room.jpg",
+      "photoCredit": {
+        "author": "emilee rader",
+        "license": "CC BY-SA 2.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Mary_Mac%27s_Tea_Room_Inside.jpg"
+      }
     },
     {
       "id": "topgolf-midtown",
@@ -271,7 +350,13 @@ export const CATALOG_FILE = {
       "tags": [
         "soul-food",
         "iconic"
-      ]
+      ],
+      "photo": "/venues/busy-bee-cafe.jpg",
+      "photoCredit": {
+        "author": "Clifflandis",
+        "license": "CC0",
+        "source": "https://commons.wikimedia.org/wiki/File:The_Busy_Bee_Caf%C3%A9.jpg"
+      }
     },
     {
       "id": "tassilis-raw-reality",
@@ -304,7 +389,13 @@ export const CATALOG_FILE = {
         "international",
         "budget",
         "adventurous"
-      ]
+      ],
+      "photo": "/venues/buford-highway-food-crawl.jpg",
+      "photoCredit": {
+        "author": "Thomson200",
+        "license": "CC0",
+        "source": "https://commons.wikimedia.org/wiki/File:Stir-fried_ice_cream_on_Buford_Highway,_September_2016.jpg"
+      }
     },
     {
       "id": "plaza-theatre",
@@ -320,7 +411,13 @@ export const CATALOG_FILE = {
       "tags": [
         "indoor",
         "indie-film"
-      ]
+      ],
+      "photo": "/venues/plaza-theatre.jpg",
+      "photoCredit": {
+        "author": "Marc Merlin",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Nighttime_view_of_the_Plaza_Theatre_in_Atlanta_with_its_neon-illuminated_facade_and_marquee.jpg"
+      }
     },
     {
       "id": "dads-garage-improv",
@@ -354,7 +451,13 @@ export const CATALOG_FILE = {
         "indoor",
         "science",
         "dinosaurs"
-      ]
+      ],
+      "photo": "/venues/fernbank-museum.jpg",
+      "photoCredit": {
+        "author": "Daniel Mayer",
+        "license": "CC BY-SA 3.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Fernbank_Museum_of_Natural_History_-_Dinosaur_Entrance_Plaza.JPG"
+      }
     },
     {
       "id": "atlanta-history-center",
@@ -371,7 +474,13 @@ export const CATALOG_FILE = {
         "indoor",
         "history",
         "gardens"
-      ]
+      ],
+      "photo": "/venues/atlanta-history-center.jpg",
+      "photoCredit": {
+        "author": "DividedFrame",
+        "license": "CC BY-SA 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Atlanta_History_Center,_2026.jpg"
+      }
     },
     {
       "id": "chattahoochee-river-hike",
@@ -388,7 +497,13 @@ export const CATALOG_FILE = {
         "free",
         "outdoors",
         "nature"
-      ]
+      ],
+      "photo": "/venues/chattahoochee-river-hike.jpg",
+      "photoCredit": {
+        "author": "John Phelan",
+        "license": "CC BY 4.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Cochran_Shoals_Trail_bridge,_Cumberland_GA.jpg"
+      }
     },
     {
       "id": "stone-mountain-summit-hike",
@@ -405,7 +520,13 @@ export const CATALOG_FILE = {
         "outdoors",
         "hike",
         "views"
-      ]
+      ],
+      "photo": "/venues/stone-mountain-summit-hike.jpg",
+      "photoCredit": {
+        "author": "formulanone",
+        "license": "CC BY-SA 2.0",
+        "source": "https://commons.wikimedia.org/wiki/File:Stone_Mountain_Aerial_(43835979545).jpg"
+      }
     }
   ]
 } as const;
