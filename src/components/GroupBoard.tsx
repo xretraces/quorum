@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildFallbackPlans } from "../lib/fallback";
 import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
+import { isClosed } from "../lib/invite";
 import { type Group, invoke, InvokeError, type Member, myMemberId, type Plan, statusBadge, supabase } from "../lib/supabase";
 import { FinalPlan } from "./FinalPlan";
 import { GrokWorking } from "./GrokWorking";
@@ -216,7 +217,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             href="/"
             onClick={home}
             aria-label="Back to your groups"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl text-indigo-600 shadow-md transition-colors hover:bg-indigo-50"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-indigo-600 shadow-md transition-colors hover:bg-indigo-50"
           >
             ←
           </a>
@@ -229,7 +230,14 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
 
         {!me && (
           <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-            You're viewing this group but haven't joined on this device. <a className="underline" href={`/join/${group.invite_code}`}>Join</a>
+            {isClosed(group) ? (
+              "You're viewing this group's plan. It isn't taking new people."
+            ) : (
+              <>
+                You're viewing this group but haven't joined on this device.{" "}
+                <a className="inline-block py-2 font-semibold underline" href={`/join/${group.invite_code}`}>Join</a>
+              </>
+            )}
           </p>
         )}
 

@@ -3,6 +3,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { avatarColor, initials } from "../lib/booking";
+import { copyText, inviteUrl as inviteUrlFor } from "../lib/invite";
 import type { Group, Member } from "../lib/supabase";
 import { GrokAvatar } from "./Grok";
 import { Questionnaire } from "./Questionnaire";
@@ -19,7 +20,7 @@ type Props = {
 export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props) {
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const inviteUrl = `${window.location.origin}/join/${group.invite_code}`;
+  const inviteUrl = inviteUrlFor(group.invite_code); // always the live site, even from localhost
   const ready = members.filter((m) => m.prefs_ready).length;
   const allReady = members.length > 0 && ready === members.length;
   const canForce = ready >= 2;
@@ -30,14 +31,10 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
     setTimeout(() => setNote(null), 2000);
   };
   async function copy() {
-    try {
-      await navigator.clipboard.writeText(inviteUrl);
-      flash("Link copied");
-    } catch {
-      flash("Couldn't copy. Long-press the link instead.");
-    }
+    flash((await copyText(inviteUrl)) ? "Copied!" : "Couldn't copy. Long-press the link instead.");
   }
   async function share() {
+    // Desktop browsers often have no navigator.share: fall back to copying the link.
     if (navigator.share) {
       try {
         await navigator.share({ title: `Join ${group.name} on Quorum`, text: `Join "${group.name}" on Quorum`, url: inviteUrl });
@@ -53,8 +50,9 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
     <div className="space-y-4">
       <section className="rounded-2xl bg-white p-4 text-center shadow-md">
         <p className="text-sm font-semibold text-gray-700">Scan to join</p>
-        <div className="mx-auto mt-3 w-full max-w-[260px] rounded-2xl bg-white p-3 ring-1 ring-gray-200">
-          <QRCodeSVG value={inviteUrl} size={512} marginSize={1} className="h-auto w-full" title={`Invite link for ${group.name}`} />
+        <p className="text-xs text-gray-500">No app needed. Just point your phone camera here.</p>
+        <div className="mx-auto mt-3 w-full max-w-[280px] rounded-2xl bg-white p-3 ring-1 ring-gray-200">
+          <QRCodeSVG value={inviteUrl} size={512} marginSize={4} bgColor="#ffffff" fgColor="#000000" className="h-auto w-full" title={`Invite link for ${group.name}`} />
         </div>
         <p className="mt-2 break-all font-mono text-xs text-gray-500">{inviteUrl}</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -65,7 +63,7 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
             Share
           </button>
         </div>
-        {note && <p className="mt-2 text-sm text-emerald-700">{note}</p>}
+        {note && <p role="status" className="mt-2 text-sm text-emerald-700">{note}</p>}
       </section>
 
       <section className="rounded-2xl bg-white p-4 shadow-md">
