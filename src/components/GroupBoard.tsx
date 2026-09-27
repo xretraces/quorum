@@ -263,7 +263,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
               <span className="inline-block rtl:-scale-x-100">←</span>
             </a>
             <div className="min-w-0 flex-1">
-              <a href={lobbyPath} onClick={toLobby} className="block truncate text-xs font-semibold text-navy">{tNodes("answers.backTo", { group: iso(group.name) })}</a>
+              <a href={lobbyPath} onClick={toLobby} className="block break-words text-xs font-semibold text-navy">{tNodes("answers.backTo", { group: iso(group.name) })}</a>
               <h1 className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{t("lobby.yourAnswers")}</h1>
             </div>
           </header>

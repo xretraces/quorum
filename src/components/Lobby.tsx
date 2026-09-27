@@ -112,10 +112,12 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
               <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${avatarColor(m.display_name)}`}>
                 {initials(m.display_name)}
               </span>
-              <span className="min-w-0 flex-1 truncate font-medium text-gray-900">
-                <bdi>{m.display_name}</bdi>
-                {m.is_organizer && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.creatorTag")}</span>}
-                {m.id === me?.id && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.youTag")}</span>}
+              {/* The name truncates inside its own <bdi>, so a long Latin name in Arabic keeps its start and ends in "…"
+                  (truncating the whole RTL row cut the name's first letters), and the creator / you tags stay visible. */}
+              <span className="flex min-w-0 flex-1 items-baseline font-medium text-gray-900">
+                <bdi className="min-w-0 truncate">{m.display_name}</bdi>
+                {m.is_organizer && <span className="ms-1 shrink-0 text-xs font-normal text-gray-500">{t("lobby.creatorTag")}</span>}
+                {m.id === me?.id && <span className="ms-1 shrink-0 text-xs font-normal text-gray-500">{t("lobby.youTag")}</span>}
               </span>
               {m.prefs_ready ? (
                 <span className="flex items-center gap-1 text-sm font-semibold text-emerald-600">
