@@ -57,7 +57,8 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [notFound, setNotFound] = useState(false); // translated at render, so load() stays language-independent
-  const [painting, setPainting] = useState<Set<string>>(new Set());
+  const [painting, setPainting] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
   const [myRun, setMyRun] = useState<GrokRun | null>(null);
   const [dismissedRun, setDismissedRun] = useState<number | null>(null);
   const { remote: remoteRun, announce } = useGrokRun(groupId);
@@ -66,7 +67,6 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
   const grokRun = [myRun, remoteRun].find((r) => r && r.startedAt !== dismissedRun) ?? null;
   const dismissGrokRun = useCallback(() => setDismissedRun(grokRun?.startedAt ?? null), [grokRun?.startedAt]);
   const decideSent = useRef<string | null>(null);
-  const finalRecapAsked = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const [g, m, p] = await Promise.all([
@@ -134,25 +134,19 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
       });
   }, [winner, leading, groupId]);
 
-  const paint = useCallback((planId: string | null) => {
-    const key = planId ?? "final";
-    setPainting((s) => new Set(s).add(key));
-    invoke("recap-image", planId ? { group_id: groupId, plan_id: planId } : { group_id: groupId })
-      .catch((e) => console.warn("recap-image failed; keeping the placeholder", e))
-      .finally(() => setPainting((s) => {
-        const n = new Set(s);
-        n.delete(key);
-        return n;
-      }));
-  }, [groupId]);
-
-  // Grok Imagine only paints the WINNING plan's poster (plan cards show real venue photos): the creator asks once.
-  useEffect(() => {
-    if (!winner || !me?.is_organizer || winner.recap_image_url || group?.recap_image_url) return;
-    if (painting.has(winner.id) || finalRecapAsked.current === winner.id) return;
-    finalRecapAsked.current = winner.id;
-    paint(null);
-  }, [winner, me?.is_organizer, group?.recap_image_url, painting, paint]);
+  // The final screen shows real photos of the places. A Grok Imagine poster is only made when a member asks for it
+  // ("Make a Grok poster"), never automatically, so no image calls are spent unless someone wants one.
+  const makePoster = useCallback(() => {
+    setPosterFailed(false);
+    setPainting(true);
+    invoke("recap-image", { group_id: groupId })
+      .then(() => load())
+      .catch((e) => {
+        console.warn("recap-image failed", e);
+        setPosterFailed(true);
+      })
+      .finally(() => setPainting(false));
+  }, [groupId, load]);
 
   async function run(label: string, fn: () => Promise<unknown>) {
     setBusy(label);
@@ -371,7 +365,14 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
         )}
 
         {stage === "final" && winner && (
-          <FinalPlan group={group} plan={winner} members={members} painting={painting.has("final") || painting.has(winner.id)} />
+          <FinalPlan
+            group={group}
+            plan={winner}
+            members={members}
+            painting={painting}
+            onMakePoster={me ? makePoster : undefined}
+            posterFailed={posterFailed}
+          />
         )}
 
         {info && <div className="q-alert q-alert-info mt-6 max-w-xl">{info}</div>}

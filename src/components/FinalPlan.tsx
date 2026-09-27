@@ -1,5 +1,6 @@
-// "Your plan": the winning plan, shown live on every member's phone once the vote is decided. Grok Imagine poster,
-// itinerary, Add to calendar (.ics) and Share.
+// "Your plan": the winning plan, shown live on every member's phone once the vote is decided. Real photos of the actual
+// places (same stored, credited photos and fallback order as the plan cards), itinerary, Add to calendar (.ics) and Share.
+// A Grok Imagine poster is optional: members can ask for one with "Make a Grok poster"; one already made is shown.
 import { useState } from "react";
 import { catalogEntry } from "../lib/booking";
 import { localStart } from "../i18n/format";
@@ -9,16 +10,28 @@ import { downloadIcs } from "../lib/calendar";
 import { type Group, type Member, type Plan, usd } from "../lib/supabase";
 import { GrokSays } from "./Grok";
 import { Recap } from "./Recap";
+import { FinalPhotos } from "./VenuePhotos";
 
-type Props = { group: Group; plan: Plan; members: Member[]; painting: boolean };
+type Props = {
+  group: Group;
+  plan: Plan;
+  members: Member[];
+  /** A Grok Imagine poster is being made right now (from this phone). */
+  painting: boolean;
+  /** Ask Grok Imagine for a poster (members only; undefined hides the button). */
+  onMakePoster?: () => void;
+  posterFailed?: boolean;
+};
 
-export function FinalPlan({ group, plan: original, members, painting }: Props) {
+export function FinalPlan({ group, plan: original, members, painting, onMakePoster, posterFailed }: Props) {
   const t = useT();
   const { lang } = useLanguage();
   const { plan, transitNotes, pending } = usePlanTranslation(original);
   const shimmer = pending ? "shimmer-text" : "";
   const [note, setNote] = useState<string | null>(null);
   const votes = members.filter((m) => m.vote_plan_id === plan.id).length;
+  const posterUrl = original.recap_image_url ?? group.recap_image_url;
+  const showPoster = !!posterUrl || painting;
 
   function text() {
     return [
@@ -53,13 +66,25 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
     <section className="mx-auto w-fit max-w-full">
       <div className="grid items-stretch gap-8 lg:grid-cols-[28rem_20rem] lg:gap-12">
         <div className="flex min-h-0 min-w-0 flex-col">
-          <Recap
-            plan={plan}
-            url={plan.recap_image_url ?? group.recap_image_url}
-            painting={painting}
-            className="aspect-[16/10] lg:aspect-auto lg:min-h-full lg:flex-1"
-          />
-          <p className="mt-2 text-[11px] text-navy/65">{t("final.posterCredit")}</p>
+          <FinalPhotos items={original.items} />
+          {(showPoster || onMakePoster) && (
+            <div data-testid="grok-poster" className="mt-5">
+              {showPoster ? (
+                <>
+                  <Recap plan={plan} url={posterUrl} painting={painting} className="aspect-[16/10]" />
+                  <p className="mt-2 text-[11px] text-navy/65">{t("final.posterCredit")}</p>
+                </>
+              ) : (
+                <>
+                  <button onClick={onMakePoster} className="q-btn q-btn-secondary w-full">
+                    {t("final.makePoster")}
+                  </button>
+                  <p className="mt-2 text-center text-[11px] text-navy/65">{t("final.makePosterHint")}</p>
+                </>
+              )}
+              {posterFailed && !showPoster && <p className="mt-1 text-center text-xs font-medium text-red-700">{t("final.posterFailed")}</p>}
+            </div>
+          )}
         </div>
 
         <div className="w-full max-w-xs lg:w-80 lg:max-w-none">
