@@ -129,7 +129,7 @@ export function FinalPhotos({ items }: { items: PlanItem[] }) {
         <Photo item={first} img={shown[0]} i={0} className="h-full w-full" onFail={onFail} eager />
         <figcaption className={`${caption} p-3 pt-12`}>
           <span className="block text-[11px] font-semibold uppercase tracking-wide text-white/80">{t("final.stopN", { n: 1 })}</span>
-          <span dir="auto" className="block truncate text-lg font-bold leading-tight text-white drop-shadow">📍 {short(first.name)}</span>
+          <span className="block truncate text-lg font-bold leading-tight text-white drop-shadow">📍 <bdi>{short(first.name)}</bdi></span>
         </figcaption>
       </figure>
       {rest.length > 0 && (
@@ -144,7 +144,7 @@ export function FinalPhotos({ items }: { items: PlanItem[] }) {
               <Photo item={it} img={shown[k + 1]} i={k + 1} className="h-full w-full" onFail={onFail} eager />
               <figcaption className={`${caption} p-2 pt-8`}>
                 <span className="block text-[10px] font-semibold uppercase tracking-wide text-white/80">{t("final.stopN", { n: k + 2 })}</span>
-                <span dir="auto" className="block truncate text-sm font-semibold leading-tight text-white drop-shadow">{short(it.name)}</span>
+                <span className="block truncate text-sm font-semibold leading-tight text-white drop-shadow"><bdi>{short(it.name)}</bdi></span>
               </figcaption>
             </figure>
           ))}
