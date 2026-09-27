@@ -8,8 +8,7 @@ import { HangMascots } from "./HangMascots";
 import { QuorumHeader } from "./QuorumHeader";
 import { YourGroups } from "./YourGroups";
 
-const field =
-  "min-h-12 w-full rounded-lg border-2 border-navy/35 bg-white/70 px-4 py-3.5 text-base text-navy placeholder:text-navy/45 focus:border-navy focus:bg-white focus:outline-none";
+const field = "q-input border-navy/40 bg-white/85 placeholder:text-navy/65 focus:bg-white";
 
 type Props = { onCreated: (groupId: string) => void; onJoinCode: (code: string) => void; onOpen: (groupId: string) => void };
 
@@ -88,11 +87,11 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
           />
           <button
             disabled={busy}
-            className="min-h-14 w-full rounded-md bg-sun px-8 text-lg font-semibold text-navy transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="q-btn q-btn-primary min-h-14 w-full text-lg"
           >
             {busy ? t("landing.creating") : t("landing.createButton")}
           </button>
-          {err && <p className="text-center text-sm font-medium text-red-800">{err}</p>}
+          {err && <p role="alert" className="q-alert q-alert-error">{err}</p>}
         </form>
 
         <form onSubmit={join} className="space-y-3 text-center">
@@ -105,7 +104,7 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
               placeholder={t("landing.codePlaceholder")}
               required
             />
-            <button className="min-h-12 rounded-md border-2 border-navy bg-white/80 px-6 py-3 text-base font-semibold text-navy transition-colors hover:bg-white sm:shrink-0">
+            <button className="q-btn q-btn-dark px-6 sm:shrink-0">
               {t("landing.joinShort")}
             </button>
           </div>

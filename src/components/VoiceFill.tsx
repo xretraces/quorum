@@ -36,8 +36,8 @@ export function VoiceFill({ current, apply }: Props) {
     const els = changed.map((f) => fields[FIELDS.indexOf(f)]).filter(Boolean);
     for (const el of els) {
       el.style.transition = "box-shadow 0.3s, background-color 0.3s";
-      el.style.boxShadow = "0 0 0 3px rgb(129 140 248)";
-      el.style.backgroundColor = "rgb(238 242 255)";
+      el.style.boxShadow = "0 0 0 4px rgb(154 214 244 / 0.7)";
+      el.style.backgroundColor = "rgb(154 214 244 / 0.15)";
     }
     const id = window.setTimeout(() => {
       for (const el of els) {
@@ -71,13 +71,13 @@ export function VoiceFill({ current, apply }: Props) {
   }
 
   return (
-    <div ref={box} className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3" data-voice-fill>
-      <label className="block text-sm font-medium text-gray-800" htmlFor="voice-fill-text">
+    <div ref={box} className="space-y-3" data-voice-fill>
+      <label className="block text-base font-semibold text-navy" htmlFor="voice-fill-text">
         {t("voice.title")}
       </label>
       <textarea
         id="voice-fill-text"
-        className="h-16 w-full resize-none rounded-lg border border-gray-300 bg-white p-2 text-base"
+        className="q-form-input h-20 resize-none"
         placeholder={t("voice.placeholder")}
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -92,7 +92,7 @@ export function VoiceFill({ current, apply }: Props) {
         <VoiceButton
           idleLabel={t("voice.speak")}
           disabled={busy}
-          className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-gray-700"
+          className="q-btn q-btn-secondary min-h-11 px-4 text-sm"
           onTranscript={async (heard) => {
             setText(heard);
             await fill(heard);
@@ -104,14 +104,13 @@ export function VoiceFill({ current, apply }: Props) {
           type="button"
           disabled={busy || !text.trim()}
           onClick={() => void fill(text)}
-          className="flex-1 rounded-xl bg-gray-900 px-4 py-2 font-semibold text-white disabled:opacity-50"
+          className="q-btn q-btn-dark min-h-11 flex-1 px-4 text-sm"
         >
           {busy ? t("voice.reading") : t("voice.fill")}
         </button>
       </div>
       {msg && (
-        <p role="status" className={`text-sm ${msg.kind === "err" ? "text-red-600" : msg.kind === "ok" ? "text-indigo-700" : "text-gray-600"}`}>
-          {msg.kind === "ok" ? "✨ " : ""}
+        <p role="status" className={`text-sm ${msg.kind === "err" ? "text-red-700" : msg.kind === "ok" ? "font-medium text-navy" : "text-navy/65"}`}>
           {msg.text}
         </p>
       )}
