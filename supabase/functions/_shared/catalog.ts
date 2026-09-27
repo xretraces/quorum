@@ -4,7 +4,57 @@ export const CATALOG_FILE = {
   "version": "2026-09-26",
   "city": "Atlanta, GA",
   "currency": "usd",
-  "photos_note": "photo = 800px JPG in public/venues/ from Wikimedia Commons or Flickr via Openverse (CC BY / CC BY-SA / CC0 / public domain only), or pre-generated with Grok Imagine where no real photo clearly shows the place (photoCredit.license = \"AI-generated\", shown as \"Image by Grok Imagine\"); photoCredit = author, license, source page.",
+  "photos_note": "photos = ordered by kind, never by array position: \"real\" (a photo of that exact place: Wikimedia Commons / Flickr under CC BY, CC BY-SA, CC0 or public domain, or the venue's own official site photo, credited to the venue) > \"stock\" (a free-license stock photo that fits the venue type) > \"ai\" (a pre-generated Grok Imagine picture; last resort only, none in use). stock_photos = one free-license (CC0) stock photo per category, used when a stop has no stored photo of its own. All images are 800px JPGs in public/venues/ (stock in public/venues/stock/). Credit fields: author, license, source page, site.",
+  "stock_photos": {
+    "food": {
+      "kind": "stock",
+      "src": "/venues/stock/food.jpg",
+      "author": "Rob Bye",
+      "license": "CC0",
+      "source": "https://stocksnap.io/photo/people-guys-WM3J4YX5TK",
+      "site": "StockSnap"
+    },
+    "activity": {
+      "kind": "stock",
+      "src": "/venues/stock/activity.jpg",
+      "author": "Helena Lopes",
+      "license": "CC0",
+      "source": "https://stocksnap.io/photo/group-friends-YBGQFVYDDC",
+      "site": "StockSnap"
+    },
+    "outdoors": {
+      "kind": "stock",
+      "src": "/venues/stock/outdoors.jpg",
+      "author": "Matt Bango",
+      "license": "CC0",
+      "source": "https://stocksnap.io/photo/nature-path-LQBZAC5DA4",
+      "site": "StockSnap"
+    },
+    "attraction": {
+      "kind": "stock",
+      "src": "/venues/stock/attraction.jpg",
+      "author": "Jakob Owens",
+      "license": "CC0",
+      "source": "https://stocksnap.io/photo/water-aquarium-YMWZA2MNPF",
+      "site": "StockSnap"
+    },
+    "museum": {
+      "kind": "stock",
+      "src": "/venues/stock/museum.jpg",
+      "author": "Søren Astrup Jørgensen",
+      "license": "CC0",
+      "source": "https://stocksnap.io/photo/alone-solo-603GFDTUCU",
+      "site": "StockSnap"
+    },
+    "entertainment": {
+      "kind": "stock",
+      "src": "/venues/stock/entertainment.jpg",
+      "author": "Freestocks.org",
+      "license": "CC0",
+      "source": "https://stocksnap.io/photo/microphone-music-8KQC04JDT0",
+      "site": "StockSnap"
+    }
+  },
   "activities": [
     {
       "id": "ponce-city-market-food-hall",
@@ -24,12 +74,16 @@ export const CATALOG_FILE = {
         "variety",
         "indoor"
       ],
-      "photo": "/venues/ponce-city-market-food-hall.jpg",
-      "photoCredit": {
-        "author": "Keizers",
-        "license": "CC BY-SA 3.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Ponce_City_Market_1.JPG"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/ponce-city-market-food-hall.jpg",
+          "author": "Keizers",
+          "license": "CC BY-SA 3.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Ponce_City_Market_1.JPG",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "skyline-park-pcm",
@@ -47,12 +101,16 @@ export const CATALOG_FILE = {
         "games",
         "views"
       ],
-      "photo": "/venues/skyline-park-pcm.jpg",
-      "photoCredit": {
-        "author": "Grok Imagine",
-        "license": "AI-generated",
-        "source": "xAI"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/skyline-park-pcm.jpg",
+          "author": "Ponce City Market",
+          "license": "official venue photo",
+          "source": "https://poncecitymarket.com/directory/skyline-park/",
+          "site": "poncecitymarket.com"
+        }
+      ]
     },
     {
       "id": "beltline-eastside-trail",
@@ -70,12 +128,16 @@ export const CATALOG_FILE = {
         "walk",
         "street-art"
       ],
-      "photo": "/venues/beltline-eastside-trail.jpg",
-      "photoCredit": {
-        "author": "John Phelan",
-        "license": "CC BY 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Atlanta_Beltline_Eastside_Trail,_Inman_Park_GA.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/beltline-eastside-trail.jpg",
+          "author": "John Phelan",
+          "license": "CC BY 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Atlanta_Beltline_Eastside_Trail,_Inman_Park_GA.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "krog-street-market",
@@ -95,12 +157,16 @@ export const CATALOG_FILE = {
         "variety",
         "indoor"
       ],
-      "photo": "/venues/krog-street-market.jpg",
-      "photoCredit": {
-        "author": "LittleT889",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Krog_Street_Market.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/krog-street-market.jpg",
+          "author": "LittleT889",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Krog_Street_Market.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "georgia-aquarium",
@@ -117,12 +183,16 @@ export const CATALOG_FILE = {
         "indoor",
         "iconic"
       ],
-      "photo": "/venues/georgia-aquarium.jpg",
-      "photoCredit": {
-        "author": "Zac Wolf",
-        "license": "CC BY-SA 2.5",
-        "source": "https://commons.wikimedia.org/wiki/File:Male_whale_shark_at_Georgia_Aquarium.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/georgia-aquarium.jpg",
+          "author": "Zac Wolf",
+          "license": "CC BY-SA 2.5",
+          "source": "https://commons.wikimedia.org/wiki/File:Male_whale_shark_at_Georgia_Aquarium.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "world-of-coca-cola",
@@ -140,12 +210,16 @@ export const CATALOG_FILE = {
         "iconic",
         "tasting"
       ],
-      "photo": "/venues/world-of-coca-cola.jpg",
-      "photoCredit": {
-        "author": "Marco Correa",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:World_of_Coca_Cola_2015-04-09.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/world-of-coca-cola.jpg",
+          "author": "Marco Correa",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:World_of_Coca_Cola_2015-04-09.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "center-civil-human-rights",
@@ -163,12 +237,16 @@ export const CATALOG_FILE = {
         "history",
         "meaningful"
       ],
-      "photo": "/venues/center-civil-human-rights.jpg",
-      "photoCredit": {
-        "author": "Marco Correa",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:National_Center_for_Civil_and_Human_Rights_01.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/center-civil-human-rights.jpg",
+          "author": "Marco Correa",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:National_Center_for_Civil_and_Human_Rights_01.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "mlk-national-historical-park",
@@ -186,12 +264,16 @@ export const CATALOG_FILE = {
         "history",
         "meaningful"
       ],
-      "photo": "/venues/mlk-national-historical-park.jpg",
-      "photoCredit": {
-        "author": "Schatzim",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Ebenezer_Baptist_Church_-_Atlanta_Georgia_-_Sign.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/mlk-national-historical-park.jpg",
+          "author": "Schatzim",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Ebenezer_Baptist_Church_-_Atlanta_Georgia_-_Sign.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "sweet-auburn-curb-market",
@@ -211,12 +293,16 @@ export const CATALOG_FILE = {
         "budget",
         "local"
       ],
-      "photo": "/venues/sweet-auburn-curb-market.jpg",
-      "photoCredit": {
-        "author": "Warren LeMay",
-        "license": "CC0",
-        "source": "https://commons.wikimedia.org/wiki/File:Atlanta_Municipal_Market,_Atlanta,_GA_(40508645753).jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/sweet-auburn-curb-market.jpg",
+          "author": "Warren LeMay",
+          "license": "CC0",
+          "source": "https://commons.wikimedia.org/wiki/File:Atlanta_Municipal_Market,_Atlanta,_GA_(40508645753).jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "high-museum-of-art",
@@ -233,12 +319,16 @@ export const CATALOG_FILE = {
         "indoor",
         "art"
       ],
-      "photo": "/venues/high-museum-of-art.jpg",
-      "photoCredit": {
-        "author": "Marc Merlin",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:High_Museum_of_Art,_Meier_Building.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/high-museum-of-art.jpg",
+          "author": "Marc Merlin",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:High_Museum_of_Art,_Meier_Building.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "atlanta-botanical-garden",
@@ -255,12 +345,16 @@ export const CATALOG_FILE = {
         "outdoors",
         "gardens"
       ],
-      "photo": "/venues/atlanta-botanical-garden.jpg",
-      "photoCredit": {
-        "author": "Daderot",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Dorothy_Chapman_Fuqua_Conservatory_-_Atlanta_Botanical_Garden,_Atlanta,_GA.JPG"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/atlanta-botanical-garden.jpg",
+          "author": "Daderot",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Dorothy_Chapman_Fuqua_Conservatory_-_Atlanta_Botanical_Garden,_Atlanta,_GA.JPG",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "piedmont-park",
@@ -278,12 +372,16 @@ export const CATALOG_FILE = {
         "outdoors",
         "picnic"
       ],
-      "photo": "/venues/piedmont-park.jpg",
-      "photoCredit": {
-        "author": "EternalAhsoka",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Piedmont_Park_Atlanta.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/piedmont-park.jpg",
+          "author": "EternalAhsoka",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Piedmont_Park_Atlanta.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "mary-macs-tea-room",
@@ -303,12 +401,16 @@ export const CATALOG_FILE = {
         "classic"
       ],
       "dietary_note": "Vegetable-sides plate available",
-      "photo": "/venues/mary-macs-tea-room.jpg",
-      "photoCredit": {
-        "author": "emilee rader",
-        "license": "CC BY-SA 2.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Mary_Mac%27s_Tea_Room_Inside.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/mary-macs-tea-room.jpg",
+          "author": "emilee rader",
+          "license": "CC BY-SA 2.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Mary_Mac%27s_Tea_Room_Inside.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "topgolf-midtown",
@@ -327,12 +429,16 @@ export const CATALOG_FILE = {
         "indoor-outdoor"
       ],
       "dietary_note": "Price is a bay-time share estimate, food extra",
-      "photo": "/venues/topgolf-midtown.jpg",
-      "photoCredit": {
-        "author": "Grok Imagine",
-        "license": "AI-generated",
-        "source": "xAI"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/topgolf-midtown.jpg",
+          "author": "Topgolf",
+          "license": "official venue photo",
+          "source": "https://topgolf.com/us/atlanta-midtown/",
+          "site": "topgolf.com"
+        }
+      ]
     },
     {
       "id": "fox-bros-bbq",
@@ -350,12 +456,16 @@ export const CATALOG_FILE = {
         "bbq",
         "texas-style"
       ],
-      "photo": "/venues/fox-bros-bbq.jpg",
-      "photoCredit": {
-        "author": "Grok Imagine",
-        "license": "AI-generated",
-        "source": "xAI"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/fox-bros-bbq.jpg",
+          "author": "Fox Bros. Bar-B-Q",
+          "license": "official venue photo",
+          "source": "https://www.foxbrosbbq.com/",
+          "site": "foxbrosbbq.com"
+        }
+      ]
     },
     {
       "id": "busy-bee-cafe",
@@ -373,12 +483,16 @@ export const CATALOG_FILE = {
         "soul-food",
         "iconic"
       ],
-      "photo": "/venues/busy-bee-cafe.jpg",
-      "photoCredit": {
-        "author": "Clifflandis",
-        "license": "CC0",
-        "source": "https://commons.wikimedia.org/wiki/File:The_Busy_Bee_Caf%C3%A9.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/busy-bee-cafe.jpg",
+          "author": "Clifflandis",
+          "license": "CC0",
+          "source": "https://commons.wikimedia.org/wiki/File:The_Busy_Bee_Caf%C3%A9.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "tassilis-raw-reality",
@@ -397,12 +511,16 @@ export const CATALOG_FILE = {
         "vegan",
         "local"
       ],
-      "photo": "/venues/tassilis-raw-reality.jpg",
-      "photoCredit": {
-        "author": "Grok Imagine",
-        "license": "AI-generated",
-        "source": "xAI"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/tassilis-raw-reality.jpg",
+          "author": "Carl Black",
+          "license": "CC BY-SA 2.0",
+          "source": "https://www.flickr.com/photos/mentalize/7638830838/",
+          "site": "Flickr"
+        }
+      ]
     },
     {
       "id": "buford-highway-food-crawl",
@@ -422,12 +540,16 @@ export const CATALOG_FILE = {
         "budget",
         "adventurous"
       ],
-      "photo": "/venues/buford-highway-food-crawl.jpg",
-      "photoCredit": {
-        "author": "Grok Imagine",
-        "license": "AI-generated",
-        "source": "xAI"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/buford-highway-food-crawl.jpg",
+          "author": "Southern Foodways Alliance",
+          "license": "CC BY 2.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Buford_Highway.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "plaza-theatre",
@@ -444,12 +566,16 @@ export const CATALOG_FILE = {
         "indoor",
         "indie-film"
       ],
-      "photo": "/venues/plaza-theatre.jpg",
-      "photoCredit": {
-        "author": "Marc Merlin",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Nighttime_view_of_the_Plaza_Theatre_in_Atlanta_with_its_neon-illuminated_facade_and_marquee.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/plaza-theatre.jpg",
+          "author": "Marc Merlin",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Nighttime_view_of_the_Plaza_Theatre_in_Atlanta_with_its_neon-illuminated_facade_and_marquee.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "dads-garage-improv",
@@ -467,12 +593,16 @@ export const CATALOG_FILE = {
         "indoor",
         "evening"
       ],
-      "photo": "/venues/dads-garage-improv.jpg",
-      "photoCredit": {
-        "author": "Grok Imagine",
-        "license": "AI-generated",
-        "source": "xAI"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/dads-garage-improv.jpg",
+          "author": "Dad's Garage",
+          "license": "official venue photo",
+          "source": "https://www.dadsgarage.com/shows",
+          "site": "dadsgarage.com"
+        }
+      ]
     },
     {
       "id": "fernbank-museum",
@@ -490,12 +620,16 @@ export const CATALOG_FILE = {
         "science",
         "dinosaurs"
       ],
-      "photo": "/venues/fernbank-museum.jpg",
-      "photoCredit": {
-        "author": "Daniel Mayer",
-        "license": "CC BY-SA 3.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Fernbank_Museum_of_Natural_History_-_Dinosaur_Entrance_Plaza.JPG"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/fernbank-museum.jpg",
+          "author": "Daniel Mayer",
+          "license": "CC BY-SA 3.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Fernbank_Museum_of_Natural_History_-_Dinosaur_Entrance_Plaza.JPG",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "atlanta-history-center",
@@ -513,12 +647,16 @@ export const CATALOG_FILE = {
         "history",
         "gardens"
       ],
-      "photo": "/venues/atlanta-history-center.jpg",
-      "photoCredit": {
-        "author": "DividedFrame",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Atlanta_History_Center,_2026.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/atlanta-history-center.jpg",
+          "author": "DividedFrame",
+          "license": "CC BY-SA 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Atlanta_History_Center,_2026.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "chattahoochee-river-hike",
@@ -536,12 +674,16 @@ export const CATALOG_FILE = {
         "outdoors",
         "nature"
       ],
-      "photo": "/venues/chattahoochee-river-hike.jpg",
-      "photoCredit": {
-        "author": "John Phelan",
-        "license": "CC BY 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Cochran_Shoals_Trail_bridge,_Cumberland_GA.jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/chattahoochee-river-hike.jpg",
+          "author": "John Phelan",
+          "license": "CC BY 4.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Cochran_Shoals_Trail_bridge,_Cumberland_GA.jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     },
     {
       "id": "stone-mountain-summit-hike",
@@ -559,12 +701,16 @@ export const CATALOG_FILE = {
         "hike",
         "views"
       ],
-      "photo": "/venues/stone-mountain-summit-hike.jpg",
-      "photoCredit": {
-        "author": "formulanone",
-        "license": "CC BY-SA 2.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Stone_Mountain_Aerial_(43835979545).jpg"
-      }
+      "photos": [
+        {
+          "kind": "real",
+          "src": "/venues/stone-mountain-summit-hike.jpg",
+          "author": "formulanone",
+          "license": "CC BY-SA 2.0",
+          "source": "https://commons.wikimedia.org/wiki/File:Stone_Mountain_Aerial_(43835979545).jpg",
+          "site": "Wikimedia Commons"
+        }
+      ]
     }
   ]
 } as const;
