@@ -69,9 +69,9 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
       <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4 text-center">
         <p className="relative z-10 max-w-md text-gray-600">{msg}</p>
         {load === "offline" && (
-          <button onClick={fetchGroup} className="relative z-10 min-h-11 rounded-xl bg-spring-deep px-5 font-semibold text-white">Try again</button>
+          <button onClick={fetchGroup} className="relative z-10 min-h-11 rounded-xl bg-navy px-5 font-semibold text-white">Try again</button>
         )}
-        {load !== "loading" && <a href="/" className="relative z-10 inline-flex min-h-11 items-center text-spring-deep underline">Go to Quorum</a>}
+        {load !== "loading" && <a href="/" className="relative z-10 inline-flex min-h-11 items-center text-navy underline">Go to Quorum</a>}
       </div>
     );
   }
@@ -83,10 +83,10 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
           <p className="font-logo text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
           <h1 className="text-xl font-bold text-gray-900">"{group.name}" already picked its plan</h1>
           <p className="text-sm text-gray-600">This group isn't taking new people, but you can still see what they chose.</p>
-          <button onClick={() => onJoined(group.id)} className="w-full rounded-xl bg-spring-deep p-3 font-semibold text-white transition-colors hover:brightness-95">
+          <button onClick={() => onJoined(group.id)} className="w-full rounded-xl bg-navy p-3 font-semibold text-white transition-colors hover:brightness-95">
             See the plan
           </button>
-          <a href="/" className="inline-flex min-h-11 items-center text-sm text-spring-deep underline">Start your own group</a>
+          <a href="/" className="inline-flex min-h-11 items-center text-sm text-navy underline">Start your own group</a>
         </div>
       </div>
     );
@@ -108,7 +108,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
           autoFocus
           required
         />
-        <button disabled={busy} className="w-full rounded-xl bg-spring-deep p-3 font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-50">
+        <button disabled={busy} className="w-full rounded-xl bg-navy p-3 font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-50">
           {busy ? "Joining…" : "Join"}
         </button>
         <p className="text-center text-xs text-gray-500">

@@ -193,7 +193,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     return (
       <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4">
         <p className="relative z-10 text-gray-600">{err ?? "Loading…"}</p>
-        {err && <a href="/" onClick={home} className="relative z-10 text-spring-deep underline">Back home</a>}
+        {err && <a href="/" onClick={home} className="relative z-10 text-navy underline">Back home</a>}
       </div>
     );
   }
@@ -210,12 +210,12 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             href="/"
             onClick={home}
             aria-label="Back to your groups"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-spring-deep shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-navy shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
           >
             ←
           </a>
           <div className="min-w-0 flex-1">
-            <a href="/" onClick={home} className="font-logo text-xs font-semibold tracking-tight text-spring-deep lowercase">quorum · your groups</a>
+            <a href="/" onClick={home} className="font-logo text-xs font-semibold tracking-tight text-navy lowercase">quorum · your groups</a>
             <h1 className="truncate text-2xl font-bold text-gray-900">{group.name}</h1>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${badge.cls}`}>{badge.label}</span>
