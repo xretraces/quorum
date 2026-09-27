@@ -12,6 +12,7 @@ import { FinalPlan } from "./FinalPlan";
 import { GrokWorking } from "./GrokWorking";
 import { Lobby } from "./Lobby";
 import { PlanCard } from "./PlanCard";
+import { QuorumHeader } from "./QuorumHeader";
 
 /** Live tally: the winner once every member has voted and one plan has the most votes. */
 function tally(plans: Plan[], members: Member[]) {
@@ -195,9 +196,12 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
 
   if (!group) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gradient-to-b from-indigo-50 to-white p-4">
-        <p className="text-gray-600">{err ?? (notFound ? t("board.groupNotFound") : t("common.loading"))}</p>
-        {(err || notFound) && <a href="/" onClick={home} className="text-indigo-600 underline">{t("board.backHome")}</a>}
+      <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4">
+        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <QuorumHeader groupId={groupId} tone="onLight" />
+        </div>
+        <p className="relative z-10 text-gray-600">{err ?? (notFound ? t("board.groupNotFound") : t("common.loading"))}</p>
+        {(err || notFound) && <a href="/" onClick={home} className="relative z-10 text-navy underline">{t("board.backHome")}</a>}
       </div>
     );
   }
@@ -207,19 +211,22 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   const badge = winner ? statusBadge("decided") : statusBadge(group.status);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
-      <div className="mx-auto max-w-md space-y-4 p-4">
-        <header className="flex items-center gap-3 max-sm:pe-16">
+    <div className="quorum-inner relative isolate min-h-dvh">
+      <div className="relative z-10 mx-auto max-w-md space-y-4 p-4">
+        <div className="flex justify-end">
+          <QuorumHeader groupId={groupId} tone="onLight" />
+        </div>
+        <header className="flex items-center gap-3">
           <a
             href="/"
             onClick={home}
             aria-label={t("board.backAria")}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-indigo-600 shadow-md transition-colors hover:bg-indigo-50"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-navy shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
           >
             <span className="inline-block rtl:-scale-x-100">←</span>
           </a>
           <div className="min-w-0 flex-1">
-            <a href="/" onClick={home} className="block truncate text-xs font-bold uppercase tracking-wide text-indigo-600">{t("board.homeLink")}</a>
+            <a href="/" onClick={home} className="font-logo block truncate text-xs font-semibold tracking-tight text-navy lowercase">{t("board.homeLink")}</a>
             <h1 dir="auto" className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{group.name}</h1>
           </div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium max-sm:px-2 max-sm:text-xs ${badge.cls}`}>{t(badge.labelKey)}</span>

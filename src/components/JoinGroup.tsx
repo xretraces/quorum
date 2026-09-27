@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n/hooks";
 import { isClosed } from "../lib/invite";
 import { claimMember } from "../lib/prefs";
+import { QuorumHeader } from "./QuorumHeader";
 import { type Group, myMemberId, setMyMemberId, supabase } from "../lib/supabase";
 
 type Load = "loading" | "ok" | "not-found" | "offline";
@@ -68,39 +69,48 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
       ok: t("common.loading"),
     }[load];
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gradient-to-b from-indigo-50 to-white p-4 text-center">
-        <p className="max-w-md text-gray-600">{msg}</p>
+      <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4 text-center">
+        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <QuorumHeader tone="onLight" />
+        </div>
+        <p className="relative z-10 max-w-md text-gray-600">{msg}</p>
         {load === "offline" && (
-          <button onClick={fetchGroup} className="min-h-11 rounded-xl bg-indigo-600 px-5 font-semibold text-white">{t("common.tryAgain")}</button>
+          <button onClick={fetchGroup} className="relative z-10 min-h-11 rounded-xl bg-navy px-5 font-semibold text-white">{t("common.tryAgain")}</button>
         )}
-        {load !== "loading" && <a href="/" className="inline-flex min-h-11 items-center text-indigo-600 underline">{t("join.goHome")}</a>}
+        {load !== "loading" && <a href="/" className="relative z-10 inline-flex min-h-11 items-center text-navy underline">{t("join.goHome")}</a>}
       </div>
     );
   }
 
   if (isClosed(group)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-indigo-50 to-white p-4">
-        <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 text-center shadow-lg">
-          <p className="text-2xl font-bold text-indigo-600">Quorum</p>
+      <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
+        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <QuorumHeader tone="onLight" />
+        </div>
+        <div className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 text-center shadow-lg ring-1 ring-spring/20">
+          <p className="font-logo text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
           <h1 className="text-xl font-bold">{t("join.closedTitle", { group: group.name })}</h1>
           <p className="text-sm text-gray-600">{t("join.closedBody")}</p>
-          <button onClick={() => onJoined(group.id)} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white hover:bg-indigo-700">
+          <button onClick={() => onJoined(group.id)} className="w-full rounded-xl bg-navy p-3 font-semibold text-white hover:brightness-95">
             {t("join.seePlan")}
           </button>
-          <a href="/" className="inline-flex min-h-11 items-center text-sm text-indigo-600 underline">{t("join.startOwn")}</a>
+          <a href="/" className="inline-flex min-h-11 items-center text-sm text-navy underline">{t("join.startOwn")}</a>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-indigo-50 to-white p-4">
-      <form onSubmit={join} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-lg">
-        <p className="text-center text-2xl font-bold text-indigo-600">Quorum</p>
-        <h1 className="text-xl font-bold">{t("join.title", { group: group.name })}</h1>
+    <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
+      <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <QuorumHeader tone="onLight" />
+      </div>
+      <form onSubmit={join} className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-spring/20">
+        <p className="font-logo text-center text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
+        <h1 className="text-xl font-bold text-gray-900">{t("join.title", { group: group.name })}</h1>
         <input
-          className="w-full rounded-lg border border-gray-300 p-3 text-base focus:border-transparent focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-gray-300 p-3 text-base focus:border-spring focus:outline-none focus:ring-2 focus:ring-spring/40"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder={t("common.yourName")}
@@ -110,7 +120,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
           autoFocus
           required
         />
-        <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+        <button disabled={busy} className="w-full rounded-xl bg-navy p-3 font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-50">
           {busy ? t("join.joining") : t("join.join")}
         </button>
         <p className="text-center text-xs text-gray-500">

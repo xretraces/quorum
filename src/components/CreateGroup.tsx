@@ -1,12 +1,15 @@
 // Home screen: the creator makes a group (then lands in the lobby with the QR code and invite link),
 // or a friend enters an invite code and goes to /join/:code.
 import { useState } from "react";
+import { useT } from "../i18n/hooks";
 import { claimMember } from "../lib/prefs";
 import { setMyMemberId, supabase } from "../lib/supabase";
-import { useT } from "../i18n/hooks";
+import { HangMascots } from "./HangMascots";
+import { QuorumHeader } from "./QuorumHeader";
 import { YourGroups } from "./YourGroups";
 
-const input = "w-full rounded-lg border border-gray-300 p-3 focus:border-transparent focus:ring-2 focus:ring-indigo-500";
+const field =
+  "min-h-12 w-full rounded-lg border-2 border-navy/35 bg-white/70 px-4 py-3.5 text-base text-navy placeholder:text-navy/45 focus:border-navy focus:bg-white focus:outline-none";
 
 type Props = { onCreated: (groupId: string) => void; onJoinCode: (code: string) => void; onOpen: (groupId: string) => void };
 
@@ -49,32 +52,66 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-indigo-50 to-white p-4">
-      <div className="w-full max-w-md space-y-4">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-indigo-600">Quorum</h1>
-          <p className="mt-2 text-gray-600">{t("landing.tagline")}</p>
-        </div>
+    <div className="quorum-create relative flex min-h-dvh flex-col px-5 pt-[max(5.25rem,calc(env(safe-area-inset-top)+4.5rem))] pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-8">
+      <div className="absolute inset-x-0 top-0 z-10 px-5 pt-[max(1.15rem,env(safe-area-inset-top))] sm:px-8">
+        <QuorumHeader showLogo tone="onSpring" />
+      </div>
 
-        <YourGroups onOpen={onOpen} />
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center space-y-10">
+        <header className="text-center">
+          <div className="relative mx-auto w-fit">
+            <div className="absolute left-1/2 top-1/2 h-[130%] w-[120%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/15 blur-2xl" />
+            <HangMascots className="relative mx-auto h-24 w-auto sm:h-28" />
+          </div>
+          <h1 className="font-logo mt-4 text-5xl font-semibold leading-[0.95] tracking-tight text-white sm:text-6xl">
+            {t("landing.letsHang")}
+          </h1>
+          <p className="mx-auto mt-5 max-w-sm text-base leading-relaxed text-navy sm:text-lg">
+            {t("landing.tagline")}
+          </p>
+        </header>
 
-        <form onSubmit={create} className="space-y-3 rounded-2xl bg-white p-6 shadow-lg">
-          <h2 className="text-xl font-bold">{t("landing.createTitle")}</h2>
-          <input className={input} value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder={t("landing.groupNamePlaceholder")} required />
-          <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("common.yourName")} required />
-          <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+        <form onSubmit={create} className="space-y-3">
+          <input
+            className={field}
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            placeholder={t("landing.groupNamePlaceholder")}
+            required
+          />
+          <input
+            className={field}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("common.yourName")}
+            required
+          />
+          <button
+            disabled={busy}
+            className="min-h-14 w-full rounded-md bg-sun px-8 text-lg font-semibold text-navy transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
             {busy ? t("landing.creating") : t("landing.createButton")}
           </button>
-          {err && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{err}</p>}
+          {err && <p className="text-center text-sm font-medium text-red-800">{err}</p>}
         </form>
 
-        <form onSubmit={join} className="space-y-3 rounded-2xl bg-white p-6 shadow-lg">
-          <h2 className="text-xl font-bold">{t("landing.joinTitle")}</h2>
-          <input className={input} value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("landing.codePlaceholder")} required />
-          <button className="w-full rounded-xl border-2 border-indigo-600 p-3 font-semibold text-indigo-700 transition-colors hover:bg-indigo-50">
-            {t("landing.joinButton")}
-          </button>
+        <form onSubmit={join} className="space-y-3 text-center">
+          <p className="text-sm font-semibold text-navy/80">{t("landing.haveCode")}</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <input
+              className={field + " min-w-0 flex-1"}
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              placeholder={t("landing.codePlaceholder")}
+              required
+            />
+            <button className="min-h-12 rounded-md border-2 border-navy bg-white/80 px-6 py-3 text-base font-semibold text-navy transition-colors hover:bg-white sm:shrink-0">
+              {t("landing.joinShort")}
+            </button>
+          </div>
         </form>
+
+        <YourGroups onOpen={onOpen} />
       </div>
     </div>
   );
