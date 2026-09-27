@@ -15,3 +15,9 @@ test("overwrites dietary/availability, appends other without duplicating", () =>
   assert.deepEqual(voiceFillPatch(cur, { dietary: "vegetarian", other: "no bars" }), { dietary: "vegetarian", other: "No car. no bars" });
   assert.deepEqual(voiceFillPatch(cur, { other: "no car" }), { other: "No car." });
 });
+
+test("a reworded repeat of 'other' from a second take is not appended", () => {
+  const cur = { budget: 40, dietary: "vegetarian", availability: "free after six Saturday", other: "doesn't have a car" };
+  assert.deepEqual(voiceFillPatch(cur, { other: "I don't have a car" }), { other: "doesn't have a car" });
+  assert.deepEqual(voiceFillPatch(cur, { other: "no bars" }), { other: "doesn't have a car. no bars" });
+});
