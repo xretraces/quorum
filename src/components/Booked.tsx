@@ -157,14 +157,14 @@ export function Booked({ group, plan, members, payments, simulated, me, onRecap,
       </section>
 
       {group.recap_image_url ? (
-        <img src={group.recap_image_url} alt="Grok Imagine recap card" className="w-full rounded-2xl shadow" />
+        <img src={group.recap_image_url} alt="Recap card" className="w-full rounded-2xl shadow" />
       ) : (
         <button
           onClick={onRecap}
           disabled={busy}
           className="w-full rounded-2xl border-2 border-dashed border-gray-300 bg-white p-4 text-gray-500 transition-colors hover:border-indigo-400 hover:text-indigo-600 disabled:opacity-50"
         >
-          🎨 Make a recap card (Grok Imagine)
+          🎨 Make a recap card
         </button>
       )}
     </div>

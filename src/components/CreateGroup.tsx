@@ -14,8 +14,7 @@ type Props = { onCreated: (groupId: string) => void; onJoinCode: (code: string) 
 
 export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
   const t = useT();
-  const [groupNameInput, setGroupName] = useState<string | null>(null); // null = the (translated) default
-  const groupName = groupNameInput ?? t("landing.defaultGroupName");
+  const [groupName, setGroupName] = useState(""); // always starts empty: no default, saved or URL-provided name
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -23,10 +22,15 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    const trimmedName = groupName.trim();
+    if (!trimmedName) {
+      setErr(t("landing.groupNameRequired"));
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
-      const { data: group, error } = await supabase.from("groups").insert({ name: groupName }).select().single();
+      const { data: group, error } = await supabase.from("groups").insert({ name: trimmedName }).select().single();
       if (error) throw error;
       const { data: me, error: mErr } = await supabase
         .from("members")
@@ -76,7 +80,8 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
             value={groupName}
             onChange={(e) => setGroupName(e.target.value)}
             placeholder={t("landing.groupNamePlaceholder")}
-            required
+            aria-label={t("landing.groupNameLabel")}
+            aria-invalid={err === t("landing.groupNameRequired") || undefined}
           />
           <input
             className={field}

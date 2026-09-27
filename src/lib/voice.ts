@@ -226,7 +226,7 @@ export function browserDictate(opts: VoiceCaptureOpts): Promise<string> {
   return new Promise((resolve, reject) => {
     const SR = getSpeechRecognitionCtor();
     if (!SR) {
-      reject(new Error("Grok Voice isn't available, and this browser has no speech recognition (try Chrome)."));
+      reject(new Error("Voice transcription isn't available, and this browser has no speech recognition (try Chrome)."));
       return;
     }
     const maxMs = opts.maxMs ?? MAX_RECORD_MS;
