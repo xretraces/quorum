@@ -77,7 +77,7 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
               return (
                 <li key={i} className="flex gap-3">
                   <div className="w-16 shrink-0 pt-0.5 text-end">
-                    {s.day && <div className="text-[11px] font-semibold uppercase tracking-wider text-spring-deep">{s.day}</div>}
+                    {s.day && <div className="text-[11px] font-semibold uppercase tracking-wider text-navy/70">{s.day}</div>}
                     <div className="text-sm font-bold leading-tight tabular-nums text-navy">{s.time}</div>
                   </div>
                   <div className="flex flex-col items-center">
