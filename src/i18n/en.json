@@ -190,11 +190,11 @@
   "info.label": "How Quorum works",
   "info.title": "How Quorum works",
   "info.close": "Close",
-  "info.step1": "Everyone answers privately — budget, food, getting there, when you're free, and hard no's.",
-  "info.step2": "Grok finds 2–3 plans that fit everyone (budgets and hard no's stay hidden).",
+  "info.step1": "Everyone answers privately: budget, diet, when you're free, and anything else Grok should know.",
+  "info.step2": "Grok finds 2–3 plans that fit everyone (your answers stay hidden).",
   "info.step3": "You each vote \"I'm in\" from your own phone. Most votes wins.",
   "info.step4": "The winner shows up as a poster plus a calendar file you can save.",
   "info.privacyTitle": "Privacy promise",
-  "info.privacyBody": "Nobody in the group sees your budget or hard no's. Only Grok reads them to find a plan that fits.",
+  "info.privacyBody": "Nobody in the group sees your answers. Only Grok reads them to find a plan that fits.",
   "info.gotIt": "Got it"
 }
