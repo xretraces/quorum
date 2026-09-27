@@ -1,31 +1,46 @@
-// Group board: members, live chat, Generate Plan (Grok via make-plan) with the shared "Grok is working" steps,
-// plan cards with live approve/reject, the locked plan with PayButton holds, then the Booked screen once
-// everything is captured. Everything refetches on Realtime changes.
-import { useCallback, useEffect, useState } from "react";
-import { type Group, invoke, type Member, myMemberId, type Payment, type Plan, rejectionOf, statusBadge, supabase, usd } from "../lib/supabase";
+// Group board: lobby (QR invite, live members + ready checks, private questionnaire) -> the creator asks Grok
+// (make-plan reads everyone's private answers server-side) with the shared "Grok is working" steps -> plan cards
+// with Grok Imagine pictures and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
+// breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
+import { useCallback, useEffect, useRef, useState } from "react";
 import { buildFallbackPlans } from "../lib/fallback";
 import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
-import { cancelGroup, type Fallback, lockPlan, SIM_REASON_TEXT, simReasonOf, stripeUnavailable } from "../lib/payments";
-import { Booked } from "./Booked";
-import { DemoPlanPill } from "./Grok";
+import { type Group, invoke, InvokeError, type Member, myMemberId, type Plan, statusBadge, supabase } from "../lib/supabase";
+import { FinalPlan } from "./FinalPlan";
 import { GrokWorking } from "./GrokWorking";
-import { GroupChat } from "./GroupChat";
-import { LockedPlan } from "./LockedPlan";
+import { Lobby } from "./Lobby";
 import { PlanCard } from "./PlanCard";
-import { TOO_EXPENSIVE } from "./RejectButton";
 
-type SpeechRec = { lang: string; start: () => void; onresult: (e: { results: { transcript: string }[][] }) => void; onerror: () => void };
+const PAINT_WINDOW_MS = 2 * 60_000; // other phones show "painting" this long after plans appear
+
+/** Live tally: the winner once every member has voted and one plan has the most votes. */
+function tally(plans: Plan[], members: Member[]) {
+  const ids = new Set(plans.map((p) => p.id));
+  const counts = new Map(plans.map((p) => [p.id, 0]));
+  for (const m of members) if (m.vote_plan_id && ids.has(m.vote_plan_id)) counts.set(m.vote_plan_id, counts.get(m.vote_plan_id)! + 1);
+  const voted = members.filter((m) => m.vote_plan_id && ids.has(m.vote_plan_id)).length;
+  const allVoted = members.length > 0 && plans.length > 0 && voted === members.length;
+  const max = Math.max(0, ...counts.values());
+  const leaders = plans.filter((p) => counts.get(p.id) === max);
+  return { voted, allVoted, winner: allVoted && leaders.length === 1 ? leaders[0] : null, tied: allVoted && leaders.length > 1 ? leaders : [] };
+}
+
+function labelsFor(plan: Plan, plans: Plan[]) {
+  const min = Math.min(...plans.map((p) => p.per_person_cents));
+  const out: string[] = [];
+  if (plan.fits_everyone) out.push("Fits everyone");
+  if (plans.length > 1 && plan.per_person_cents === min && plans.some((p) => p.per_person_cents !== min)) out.push("Cheapest");
+  return out;
+}
 
 export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () => void }) {
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [chatTranscript, setChatTranscript] = useState("");
-  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [painting, setPainting] = useState<Set<string>>(new Set());
   const [myRun, setMyRun] = useState<GrokRun | null>(null);
   const [dismissedRun, setDismissedRun] = useState<number | null>(null);
   const { remote: remoteRun, announce } = useGrokRun(groupId);
@@ -33,20 +48,20 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   const me = members.find((m) => m.id === meId);
   const grokRun = [myRun, remoteRun].find((r) => r && r.startedAt !== dismissedRun) ?? null;
   const dismissGrokRun = useCallback(() => setDismissedRun(grokRun?.startedAt ?? null), [grokRun?.startedAt]);
+  const decideSent = useRef<string | null>(null);
+  const finalRecapAsked = useRef<string | null>(null);
 
   const load = useCallback(async () => {
-    const [g, m, p, pay] = await Promise.all([
+    const [g, m, p] = await Promise.all([
       supabase.from("groups").select("*").eq("id", groupId).maybeSingle(),
       supabase.from("members").select("*").eq("group_id", groupId).order("created_at"),
       supabase.from("plans").select("*").eq("group_id", groupId).order("option_index"),
-      supabase.from("payments").select("*").eq("group_id", groupId),
     ]);
     if (g.error) setErr(g.error.message);
     else if (!g.data) setErr("Group not found. Please check the group code.");
     else setGroup(g.data as Group);
     setMembers((m.data ?? []) as Member[]);
     setPlans((p.data ?? []) as Plan[]);
-    setPayments((pay.data ?? []) as Payment[]);
   }, [groupId]);
 
   useEffect(() => {
@@ -56,13 +71,48 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       .channel(`board-${groupId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "members", filter }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "plans", filter }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "payments", filter }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "groups", filter: `id=eq.${groupId}` }, load)
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [groupId, load]);
+
+  const winner = plans.find((p) => p.id === group?.selected_plan_id) ?? null;
+  const { voted, winner: leading, tied } = tally(plans, members);
+
+  // Everyone voted and one plan leads: record it (any phone may; the write is idempotent).
+  useEffect(() => {
+    if (winner || !leading || decideSent.current === leading.id) return;
+    decideSent.current = leading.id;
+    supabase.from("groups").update({ selected_plan_id: leading.id, status: "decided" }).eq("id", groupId).is("selected_plan_id", null)
+      .then(({ error }) => {
+        if (error) {
+          decideSent.current = null;
+          setErr(error.message);
+        }
+      });
+  }, [winner, leading, groupId]);
+
+  const paint = useCallback((planId: string | null) => {
+    const key = planId ?? "final";
+    setPainting((s) => new Set(s).add(key));
+    invoke("recap-image", planId ? { group_id: groupId, plan_id: planId } : { group_id: groupId })
+      .catch((e) => console.warn("recap-image failed; keeping the placeholder", e))
+      .finally(() => setPainting((s) => {
+        const n = new Set(s);
+        n.delete(key);
+        return n;
+      }));
+  }, [groupId]);
+
+  // Winner without a picture (per-plan pictures failed or recap-image isn't redeployed): the creator asks once.
+  useEffect(() => {
+    if (!winner || !me?.is_organizer || winner.recap_image_url || group?.recap_image_url) return;
+    if (painting.has(winner.id) || finalRecapAsked.current === winner.id) return;
+    finalRecapAsked.current = winner.id;
+    paint(null);
+  }, [winner, me?.is_organizer, group?.recap_image_url, painting, paint]);
 
   async function run(label: string, fn: () => Promise<unknown>) {
     setBusy(label);
@@ -80,105 +130,62 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   const vote = (planId: string) =>
     run("vote", async () => {
       if (!me) return;
-      const { rejection: _cleared, ...rest } = me.constraints ?? {};
-      void _cleared;
-      const { error } = await supabase.from("members").update({ vote_plan_id: planId, constraints: rest }).eq("id", me.id);
+      const { error } = await supabase.from("members").update({ vote_plan_id: planId }).eq("id", me.id);
       if (error) throw error;
     });
 
-  const locked = plans.find((p) => p.id === group?.selected_plan_id);
-  const booked = !!locked && (group?.status === "captured" || group?.status === "partially_captured");
-  const demoPlans = plans.some((p) => p.model === "demo-fallback");
-  const simulated = locked ? simReasonOf(members, locked.id) : null;
-
-  const onFallback = (f: Fallback) =>
-    setInfo(`Stripe is unavailable right now (${f.message}). ${SIM_REASON_TEXT[f.reason]} Everyone continues with simulated payments (test).`);
-  const lock = (planId: string) =>
-    run("lock", async () => {
-      setInfo(null);
-      const f = await lockPlan(groupId, planId);
-      if (f) onFallback(f);
+  const pick = (planId: string) =>
+    run("pick", async () => {
+      const { error } = await supabase.from("groups").update({ selected_plan_id: planId, status: "decided" }).eq("id", groupId);
+      if (error) throw error;
     });
-  const cancel = () =>
-    run("cancel", async () => {
-      const note = await cancelGroup(groupId, simulated !== null);
-      if (note) setInfo(note);
-    });
-  const recap = () => run("recap", () => invoke("recap-image", { group_id: groupId }));
 
-  const planIds = plans.map((p) => p.id);
-  const rejections = members.flatMap((m) => {
-    const r = rejectionOf(m, planIds);
-    return r ? [{ member: m, ...r }] : [];
-  });
-  const tooExpensive = rejections.some((r) => r.reason === TOO_EXPENSIVE);
-  const liveHolds = payments.some((p) => p.status !== "canceled");
-
-  async function generate(hardCap: boolean) {
-    const base = [chatTranscript, notes].filter((s) => s.trim()).join("\n");
-    if (!base.trim()) return setErr("Please add some conversation details before generating a plan.");
-    const capRule = hardCap
-      ? "\n\n[Quorum] HARD LIMIT after a 'too expensive' rejection. Every plan must fit these per-person caps: " +
-        members.map((m) => `${m.display_name} ${usd(m.budget_cap_cents)}`).join(", ") + "."
-      : "";
+  async function askGrok() {
     setBusy("grok");
     setErr(null);
     setInfo(null);
-    const run: GrokRun = { startedAt: Date.now(), finishedAt: null, outcome: "working", by: me?.display_name ?? "The organizer" };
+    const started: GrokRun = { startedAt: Date.now(), finishedAt: null, outcome: "working", by: me?.display_name ?? "The creator" };
     const finishRun = (outcome: GrokOutcome | null) => {
-      const next = outcome ? { ...run, finishedAt: Date.now(), outcome } : null;
+      const next = outcome ? { ...started, finishedAt: Date.now(), outcome } : null;
       setMyRun(next);
       announce(next);
     };
-    setMyRun(run);
-    announce(run);
+    setMyRun(started);
+    announce(started);
     try {
-      if (liveHolds) { // make-plan refuses while holds are live
-        await invoke("pay", { action: "cancel", group_id: groupId }).catch((e) => {
-          if (!stripeUnavailable(e)) throw e; // pay is down: make-plan will refuse and the saved demo plan takes over
-        });
-      }
+      let fresh: Plan[];
       try {
-        await invoke("make-plan", { group_id: groupId, transcript: base + capRule, hard_cap: hardCap });
-        finishRun("grok");
+        const res = await invoke<{ plans: Plan[]; source: "grok" | "backup" }>("make-plan", { group_id: groupId });
+        fresh = res.plans ?? [];
+        finishRun(res.source === "backup" ? "backup" : "grok");
       } catch (e) {
-        console.error("make-plan failed, using saved demo plan", e);
-        await applyFallback(hardCap);
+        // A deliberate refusal (not enough answers, nothing fits, already decided) is shown as is.
+        if (e instanceof InvokeError && e.fromFunction && e.status !== undefined && [400, 404, 409, 422].includes(e.status)) throw e;
+        console.error("make-plan failed, using saved demo plans", e);
+        fresh = await applyFallback();
         finishRun("demo");
-        setInfo(`Grok is unavailable right now (${e instanceof Error ? e.message : String(e)}). Showing a saved demo plan instead.`);
+        setInfo(`Grok couldn't be reached (${e instanceof Error ? e.message : String(e)}). Showing saved demo plans.`);
       }
       await load();
+      fresh.filter((p) => !p.recap_image_url).forEach((p) => paint(p.id));
     } catch (e) {
       finishRun(null);
-      setErr(`We couldn't generate a plan right now. ${e instanceof Error ? e.message : String(e)}`);
+      setErr(`We couldn't make plans right now. ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
     }
   }
 
-  async function applyFallback(hardCap: boolean) {
-    const rows = buildFallbackPlans(groupId, members, hardCap);
-    if (rows.length === 0) throw new Error("No saved plan fits everyone's cap.");
-    const g = await supabase.from("groups").update({ status: "voting", selected_plan_id: null }).eq("id", groupId);
+  async function applyFallback(): Promise<Plan[]> {
+    const g = await supabase.from("groups").update({ status: "voting", selected_plan_id: null, recap_image_url: null }).eq("id", groupId);
     if (g.error) throw g.error;
-    const r = await supabase.from("members").update({ vote_plan_id: null, approved: false, approved_amount_cents: null, approved_at: null }).eq("group_id", groupId);
+    const r = await supabase.from("members").update({ vote_plan_id: null }).eq("group_id", groupId);
     if (r.error) throw r.error;
     const d = await supabase.from("plans").delete().eq("group_id", groupId);
     if (d.error) throw d.error;
-    const i = await supabase.from("plans").insert(rows);
+    const i = await supabase.from("plans").insert(buildFallbackPlans(groupId, members.length)).select("*");
     if (i.error) throw i.error;
-  }
-
-  // TODO(grok-voice): swap browser speech-to-text for Grok Voice / xAI speech-to-text (SpaceXAI challenge).
-  function dictate() {
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!SR) return setErr("Speech recognition isn't supported in this browser (try Chrome).");
-    const rec = new SR();
-    rec.lang = "en-US";
-    rec.onresult = (e) => setNotes((t) => `${t ? `${t}\n` : ""}${me?.display_name ?? "Me"} (voice): ${e.results[0][0].transcript}`);
-    rec.onerror = () => setErr("Voice recognition failed. Try again.");
-    rec.start();
+    return (i.data ?? []) as Plan[];
   }
 
   const home = (e: React.MouseEvent) => {
@@ -195,11 +202,15 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     );
   }
 
-  const inviteUrl = `${window.location.origin}/join/${group.invite_code}`;
+  const organizer = members.find((m) => m.is_organizer);
+  const recentlyMade = (p: Plan) => !!p.created_at && Date.now() - new Date(p.created_at).getTime() < PAINT_WINDOW_MS;
+  const isPainting = (p: Plan) => painting.has(p.id) || (!p.recap_image_url && recentlyMade(p));
+  const stage = grokRun ? "grok" : winner ? "final" : plans.length ? "vote" : "lobby";
+  const badge = winner ? statusBadge("decided") : statusBadge(group.status);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
-      <div className="mx-auto max-w-2xl space-y-4 p-4">
+      <div className="mx-auto max-w-md space-y-4 p-4">
         <header className="flex items-center gap-3">
           <a
             href="/"
@@ -213,7 +224,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             <a href="/" onClick={home} className="text-xs font-bold uppercase tracking-wide text-indigo-600">Quorum · Your groups</a>
             <h1 className="truncate text-2xl font-bold text-gray-900">{group.name}</h1>
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${statusBadge(group.status).cls}`}>{statusBadge(group.status).label}</span>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${badge.cls}`}>{badge.label}</span>
         </header>
 
         {!me && (
@@ -222,132 +233,59 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
           </p>
         )}
 
-        {!booked && (
-          <section className="rounded-2xl bg-white p-4 shadow-md">
-            <h2 className="mb-2 font-semibold text-gray-900">Who's in ({members.length})</h2>
-            {!locked && (
-              <div className="mb-3 rounded-lg bg-gray-50 p-2">
-                <p className="text-xs text-gray-600">
-                  Group code <b className="font-mono">{group.invite_code}</b> · share this link:
-                </p>
-                <div className="mt-1 flex items-center gap-2">
-                  <code className="flex-1 truncate rounded border bg-white px-2 py-1 text-xs">{inviteUrl}</code>
-                  <button onClick={() => navigator.clipboard.writeText(inviteUrl)} className="text-xs font-medium text-indigo-600">Copy</button>
-                </div>
-              </div>
-            )}
-            <ul className="flex flex-wrap gap-2">
-              {members.map((m) => (
-                <li key={m.id} className="rounded-full bg-indigo-50 px-3 py-1.5 text-sm text-indigo-800">
-                  {m.display_name}
-                  {m.is_organizer && " 👑"}
-                  <span className="text-indigo-600"> · {usd(m.budget_cap_cents)}</span>
-                  {m.dietary && <span className="text-indigo-500"> · {m.dietary}</span>}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {rejections.length > 0 && (
-          <section className="space-y-2 rounded-2xl border-2 border-red-200 bg-red-50 p-4">
-            {rejections.map((r) => (
-              <p key={r.member.id} className="text-sm text-red-800">
-                <b>{r.member.display_name}</b> rejected the plan. Reason: {r.reason}.
-              </p>
-            ))}
-            <p className="text-sm text-red-700">This plan can't be booked. Back to planning.</p>
-            {me?.is_organizer ? (
-              <button
-                disabled={!!busy}
-                onClick={() => generate(tooExpensive)}
-                className="w-full rounded-xl bg-gray-900 p-3 font-semibold text-white disabled:opacity-50"
-              >
-                {busy === "grok" ? "Grok is replanning…" : tooExpensive ? "✨ Modify plan: regenerate within everyone's cap" : "✨ Modify plan: regenerate"}
-              </button>
-            ) : (
-              <p className="text-xs text-red-600">Waiting for the organizer to modify the plan.</p>
-            )}
-          </section>
-        )}
-
-        {(!locked || rejections.length > 0) && (
-          <section className="space-y-3 rounded-2xl bg-white p-4 shadow-md">
-            <h2 className="font-semibold text-gray-900">Group Chat</h2>
-            <GroupChat groupId={groupId} memberName={me?.display_name ?? "Guest"} onTranscriptChange={setChatTranscript} />
-          </section>
-        )}
-
-        {me?.is_organizer && !locked && !grokRun && (
-          <section className="space-y-3 rounded-2xl bg-white p-4 shadow-md">
-            <h2 className="font-semibold text-gray-900">Generate Plan</h2>
-            <p className="text-sm text-gray-600">
-              Grok reads the chat above plus anything you add here, extracts everyone's budget, diet, time, and transport, and proposes plans.
-            </p>
-            <textarea
-              className="h-20 w-full resize-none rounded-lg border border-gray-300 p-3 text-sm focus:border-transparent focus:ring-2 focus:ring-indigo-500"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder={"Optional: paste chat from elsewhere or add voice notes\nPriya: nothing over 25, no car"}
-            />
-            <div className="flex flex-wrap gap-2">
-              <button
-                disabled={!!busy}
-                onClick={() => generate(false)}
-                className="flex-1 rounded-xl bg-gray-900 px-4 py-3 font-semibold text-white transition-colors hover:bg-gray-800 disabled:opacity-50"
-              >
-                {busy === "grok" ? "Grok is planning…" : plans.length ? "✨ Generate new plans" : "✨ Generate Plan"}
-              </button>
-              <button onClick={dictate} className="rounded-xl border border-gray-300 px-4 py-3 text-gray-700 transition-colors hover:bg-gray-50">
-                🎙 Voice
-              </button>
-            </div>
-          </section>
+        {stage === "lobby" && (
+          <Lobby group={group} members={members} me={me} busy={!!busy} onAskGrok={askGrok} onRefresh={load} />
         )}
 
         {grokRun && <GrokWorking key={grokRun.startedAt} run={grokRun} isMine={grokRun === myRun} onDone={dismissGrokRun} />}
 
-        {!locked && !grokRun && plans.length > 0 && (
+        {stage === "vote" && (
           <section className="space-y-4">
-            <div className="flex items-center gap-2 px-1">
-              <h2 className="font-semibold text-gray-900">Approve or reject a plan</h2>
-              {demoPlans && <DemoPlanPill />}
+            <div className="px-1">
+              <h2 className="text-lg font-bold text-gray-900">Which plan are you in for?</h2>
+              <p className="text-sm text-gray-600">
+                {voted} of {members.length} voted. When everyone has voted, the most votes wins.
+              </p>
             </div>
+            {tied.length > 0 && (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                It's a tie!{" "}
+                {me?.is_organizer ? "You're the creator, so you pick the winner below." : `Waiting for ${organizer?.display_name ?? "the creator"} to pick.`}
+              </p>
+            )}
             {plans.map((p) => (
-              <PlanCard key={p.id} plan={p} members={members} me={me} onVote={() => vote(p.id)} onLock={() => lock(p.id)} busy={!!busy} />
+              <PlanCard
+                key={p.id}
+                plan={p}
+                labels={labelsFor(p, plans)}
+                voters={members.filter((m) => m.vote_plan_id === p.id)}
+                memberCount={members.length}
+                isMyVote={me?.vote_plan_id === p.id}
+                canVote={!!me}
+                painting={isPainting(p)}
+                busy={!!busy}
+                onVote={() => vote(p.id)}
+                onPick={me?.is_organizer && tied.some((t) => t.id === p.id) ? () => pick(p.id) : undefined}
+              />
             ))}
+            {me?.is_organizer && (
+              <button
+                disabled={!!busy}
+                onClick={askGrok}
+                className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                ✨ Ask Grok for new plans (resets votes)
+              </button>
+            )}
           </section>
         )}
 
-        {booked && (
-          <Booked group={group} plan={locked} members={members} payments={payments} simulated={simulated} me={me} onRecap={recap} busy={!!busy} />
-        )}
-
-        {locked && !booked && (
-          <LockedPlan
-            group={group}
-            plan={locked}
-            members={members}
-            payments={payments}
-            simulated={simulated}
-            me={me}
-            rejected={rejections.length > 0}
-            onRefresh={load}
-            onCancel={cancel}
-            onFallback={onFallback}
-            busy={!!busy}
-          />
+        {stage === "final" && winner && (
+          <FinalPlan group={group} plan={winner} members={members} painting={painting.has("final") || painting.has(winner.id)} />
         )}
 
         {info && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{info}</div>}
-        {err && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {err}
-            {err.startsWith("We couldn't generate") && (
-              <button onClick={() => generate(tooExpensive)} className="ml-2 font-semibold underline">Try Again</button>
-            )}
-          </div>
-        )}
+        {err && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{err}</div>}
       </div>
     </div>
   );

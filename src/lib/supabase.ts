@@ -18,7 +18,7 @@ export class InvokeError extends Error {
 }
 
 /** Calls an Edge Function and surfaces its JSON `{ error }` message on failure. */
-export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay" | "recap-image", body: unknown): Promise<T> {
+export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay" | "recap-image" | "parse-prefs", body: unknown): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body: body as Record<string, unknown> });
   if (error) {
     let msg = error.message;
@@ -48,8 +48,9 @@ export const myGroupIds = () =>
 export const forgetGroup = (groupId: string) => localStorage.removeItem(`${MEMBER_KEY}${groupId}`);
 
 const STATUS: Record<string, { label: string; cls: string }> = {
-  planning: { label: "Chatting", cls: "bg-sky-100 text-sky-700" },
+  planning: { label: "Lobby", cls: "bg-sky-100 text-sky-700" },
   voting: { label: "Voting", cls: "bg-amber-100 text-amber-700" },
+  decided: { label: "Decided", cls: "bg-emerald-100 text-emerald-700" },
   holding: { label: "Locked", cls: "bg-indigo-100 text-indigo-700" },
   captured: { label: "Booked", cls: "bg-emerald-100 text-emerald-700" },
   partially_captured: { label: "Partly booked", cls: "bg-emerald-100 text-emerald-700" },
@@ -76,7 +77,7 @@ export type Group = {
 export type Member = {
   id: string; group_id: string; display_name: string; is_organizer: boolean; budget_cap_cents: number | null;
   cap_source: string; dietary: string | null; availability: string | null; transport: string | null;
-  vote_plan_id: string | null; approved: boolean; approved_amount_cents: number | null;
+  vote_plan_id: string | null; approved: boolean; prefs_ready?: boolean; approved_amount_cents: number | null;
   constraints: Record<string, unknown> & { rejection?: Rejection; sim_payment?: SimPayment };
 };
 /**
@@ -111,7 +112,10 @@ export type Plan = {
   per_person_cents: number; total_cents: number; fits_everyone: boolean; over_cap_member_ids: string[];
   member_notes: { member_id: string | null; name: string; note: string; within_budget: boolean }[];
   why_it_works: string | null; reasoning: string | null; server_warnings: string[];
-  /** Grok model id, or "demo-fallback" for the saved demo plans (lib/fallback.ts). */
+  /** Grok model id, "backup" (make-plan's no-Grok plans from everyone's answers), or "demo-fallback" (lib/fallback.ts). */
   model?: string | null;
+  /** Grok Imagine picture of this plan (recap-image with plan_id). */
+  recap_image_url?: string | null;
+  created_at?: string;
 };
 export type Payment = { id: string; member_id: string; plan_id: string; amount_cents: number; status: string; over_cap_reapproved: boolean };

@@ -1,7 +1,8 @@
-// Home screen: organizer creates a group (then lands on the board, where the invite link is shown),
+// Home screen: the creator makes a group (then lands in the lobby with the QR code and invite link),
 // or a friend enters an invite code and goes to /join/:code.
 import { useState } from "react";
-import { dollarsToCents, INVALID_BUDGET, setMyMemberId, supabase } from "../lib/supabase";
+import { claimMember } from "../lib/prefs";
+import { setMyMemberId, supabase } from "../lib/supabase";
 import { YourGroups } from "./YourGroups";
 
 const input = "w-full rounded-lg border border-gray-300 p-3 focus:border-transparent focus:ring-2 focus:ring-indigo-500";
@@ -11,16 +12,12 @@ type Props = { onCreated: (groupId: string) => void; onJoinCode: (code: string) 
 export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
   const [groupName, setGroupName] = useState("Saturday hang");
   const [name, setName] = useState("");
-  const [cap, setCap] = useState("30");
-  const [dietary, setDietary] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
-    const capCents = dollarsToCents(cap);
-    if (capCents === null) return setErr(INVALID_BUDGET);
     setBusy(true);
     setErr(null);
     try {
@@ -28,11 +25,12 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
       if (error) throw error;
       const { data: me, error: mErr } = await supabase
         .from("members")
-        .insert({ group_id: group.id, display_name: name, is_organizer: true, budget_cap_cents: capCents, dietary: dietary || null })
+        .insert({ group_id: group.id, display_name: name, is_organizer: true })
         .select()
         .single();
       if (mErr) throw mErr;
       setMyMemberId(group.id, me.id);
+      await claimMember(me.id).catch((e) => console.warn(e)); // retried when the questionnaire opens
       onCreated(group.id);
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -52,7 +50,7 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
       <div className="w-full max-w-md space-y-4">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-indigo-600">Quorum</h1>
-          <p className="mt-2 text-gray-600">Turn messy group chats into a plan everyone can pay for.</p>
+          <p className="mt-2 text-gray-600">Everyone answers privately. Grok finds the plan that works for all of you.</p>
         </div>
 
         <YourGroups onOpen={onOpen} />
@@ -61,11 +59,6 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
           <h2 className="text-xl font-bold">Create Group</h2>
           <input className={input} value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name" required />
           <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" required />
-          <label className="block text-sm text-gray-700">
-            Maximum spending per person ($)
-            <input className={`${input} mt-1`} value={cap} onChange={(e) => setCap(e.target.value)} inputMode="decimal" placeholder="50" required />
-          </label>
-          <input className={input} value={dietary} onChange={(e) => setDietary(e.target.value)} placeholder="Dietary (optional, e.g. vegetarian)" />
           <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
             {busy ? "Creating…" : "Create Group"}
           </button>

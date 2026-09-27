@@ -1,34 +1,23 @@
-// Demo-safe fallback: saved plans for the demo conversation (Maya / Jon / Priya, see README), used only when
-// the make-plan call fails. Items and prices are copied from data/atlanta-activities.json; fit and over-cap
-// flags are recomputed here against the real roster, same as the server does for Grok output.
-import type { Member } from "./supabase";
+// Last-resort fallback: saved demo plans, used only when the make-plan call itself fails (not deployed,
+// network). When make-plan runs but Grok is down, make-plan builds "backup" plans from everyone's private
+// answers instead. The browser can't read anyone's answers, so these plans aren't checked against them and
+// are never labeled "Fits everyone". Items and prices are copied from data/atlanta-activities.json.
 
-export function buildFallbackPlans(groupId: string, members: Member[], hardCap: boolean) {
-  const partySize = Math.max(1, members.length);
-  const candidates = SAMPLE_PLAN.plans.map((p) => {
-    const over = members.filter((m) => m.budget_cap_cents !== null && p.per_person_cents > m.budget_cap_cents);
-    return { p, over };
-  });
-  const chosen = hardCap ? candidates.filter((c) => c.over.length === 0) : candidates;
-  return chosen.map(({ p, over }, i) => ({
+export function buildFallbackPlans(groupId: string, partySize: number) {
+  return SAMPLE_PLAN.plans.map((p, i) => ({
     group_id: groupId,
     option_index: i,
     title: p.title,
     summary: p.summary,
     items: p.items,
     per_person_cents: p.per_person_cents,
-    total_cents: p.per_person_cents * partySize,
-    fits_everyone: over.length === 0,
-    over_cap_member_ids: over.map((m) => m.id),
-    member_notes: members.map((m) => {
-      const cap = m.budget_cap_cents;
-      const within = cap === null || p.per_person_cents <= cap;
-      const diff = cap === null ? "" : within ? `$${(cap - p.per_person_cents) / 100} under your cap` : `$${(p.per_person_cents - cap) / 100} over your cap`;
-      return { member_id: m.id, name: m.display_name, note: diff || "No cap set", within_budget: within };
-    }),
-    why_it_works: over.length > 0 ? `${p.why_it_works} Over cap for: ${over.map((m) => m.display_name).join(", ")}.` : p.why_it_works,
-    reasoning: "Saved demo plan (live Grok call failed).",
-    server_warnings: ["Demo fallback: saved sample plan, not generated live by Grok."],
+    total_cents: p.per_person_cents * Math.max(1, partySize),
+    fits_everyone: false,
+    over_cap_member_ids: [],
+    member_notes: [],
+    why_it_works: p.why_it_works,
+    reasoning: null,
+    server_warnings: [],
     model: "demo-fallback",
   }));
 }
@@ -56,7 +45,7 @@ export const SAMPLE_PLAN = {
       ],
       per_person_cents: 1800,
       fits_everyone: true,
-      why_it_works: "Free activity + affordable food hall with variety. Everyone can get transit there and eat within budget.",
+      why_it_works: "Free street art, then a food hall with lots of choices. Reachable by MARTA.",
     },
     {
       title: "Ponce City + Skyline Park",
@@ -102,7 +91,7 @@ export const SAMPLE_PLAN = {
       ],
       per_person_cents: 1500,
       fits_everyone: true,
-      why_it_works: "The cheapest option with meaningful history. Both spots are on the streetcar line.",
+      why_it_works: "Cheap and meaningful history. Both spots are on the streetcar line.",
     },
   ],
 };

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
-export type GrokOutcome = "working" | "grok" | "demo";
+export type GrokOutcome = "working" | "grok" | "backup" | "demo";
 export type GrokRun = { startedAt: number; finishedAt: number | null; outcome: GrokOutcome; by: string };
 
 const STALE_WORKING_MS = 4 * 60_000;
