@@ -1,5 +1,6 @@
-// "Your plan": the winning plan, shown live on every member's phone once the vote is decided. Grok Imagine poster,
-// itinerary, Add to calendar (.ics) and Share.
+// "Your plan": the winning plan, shown live on every member's phone once the vote is decided. Real photos of the actual
+// places (same stored, credited photos and fallback order as the plan cards), itinerary, Add to calendar (.ics) and Share.
+// A Grok Imagine poster is optional: members can ask for one with "Make a Grok poster"; one already made is shown.
 import { useState } from "react";
 import { catalogEntry } from "../lib/booking";
 import { localStart } from "../i18n/format";
@@ -9,16 +10,28 @@ import { downloadIcs } from "../lib/calendar";
 import { type Group, type Member, type Plan, usd } from "../lib/supabase";
 import { GrokSays } from "./Grok";
 import { Recap } from "./Recap";
+import { FinalPhotos } from "./VenuePhotos";
 
-type Props = { group: Group; plan: Plan; members: Member[]; painting: boolean };
+type Props = {
+  group: Group;
+  plan: Plan;
+  members: Member[];
+  /** A Grok Imagine poster is being made right now (from this phone). */
+  painting: boolean;
+  /** Ask Grok Imagine for a poster (members only; undefined hides the button). */
+  onMakePoster?: () => void;
+  posterFailed?: boolean;
+};
 
-export function FinalPlan({ group, plan: original, members, painting }: Props) {
+export function FinalPlan({ group, plan: original, members, painting, onMakePoster, posterFailed }: Props) {
   const t = useT();
   const { lang } = useLanguage();
   const { plan, transitNotes, pending } = usePlanTranslation(original);
   const shimmer = pending ? "shimmer-text" : "";
   const [note, setNote] = useState<string | null>(null);
   const votes = members.filter((m) => m.vote_plan_id === plan.id).length;
+  const posterUrl = original.recap_image_url ?? group.recap_image_url;
+  const showPoster = !!posterUrl || painting;
 
   function text() {
     return [
@@ -60,8 +73,7 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
       </div>
 
       <div className="rounded-2xl bg-white p-3 shadow-md">
-        <Recap plan={plan} url={plan.recap_image_url ?? group.recap_image_url} painting={painting} />
-        <p className="mt-1 px-1 text-[11px] text-gray-500">{t("final.posterCredit")}</p>
+        <FinalPhotos items={original.items} />
 
         <ol className="mt-4 px-1">
           {plan.items.map((it, i) => {
@@ -105,6 +117,28 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
         </button>
       </div>
       {note && <p className="text-center text-sm text-emerald-700">{note}</p>}
+
+      {(showPoster || onMakePoster) && (
+        <div data-testid="grok-poster" className="rounded-2xl bg-white p-3 shadow-md">
+          {showPoster ? (
+            <>
+              <Recap plan={plan} url={posterUrl} painting={painting} />
+              <p className="mt-1 px-1 text-[11px] text-gray-500">{t("final.posterCredit")}</p>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onMakePoster}
+                className="w-full rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
+              >
+                {t("final.makePoster")}
+              </button>
+              <p className="mt-1 px-1 text-center text-[11px] text-gray-500">{t("final.makePosterHint")}</p>
+            </>
+          )}
+          {posterFailed && !showPoster && <p className="mt-1 px-1 text-center text-xs text-red-600">{t("final.posterFailed")}</p>}
+        </div>
+      )}
       <p className="text-center text-xs text-gray-400">{t("final.pricesNote")}</p>
     </section>
   );
