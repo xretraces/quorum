@@ -94,7 +94,7 @@ export function FinalPlan({ group, plan, members, painting }: Props) {
         </button>
       </div>
       {note && <p className="text-center text-sm text-emerald-700">{note}</p>}
-      <p className="text-center text-xs text-gray-400">Prices are estimates. Nothing is booked or charged.</p>
+      <p className="text-center text-xs text-gray-400">Prices are estimates from the catalog.</p>
     </section>
   );
 }
