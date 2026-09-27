@@ -186,6 +186,7 @@
   "final.share": "📤 مشاركة",
   "final.pricesNote": "الأسعار تقديرية من الكتالوج.",
   "final.copied": "تم النسخ",
+  "final.linkCopied": "تم نسخ الرابط",
   "final.shareFailed": "تعذّرت المشاركة في هذا المتصفح",
   "final.shareAbout": "نحو {price} للشخص",
   "final.stopN": "المحطة {n}",

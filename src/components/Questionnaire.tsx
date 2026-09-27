@@ -3,6 +3,7 @@
 // fields it gets (see mergePrefs) and never wipes typed ones. `mic` renders in the empty slot at the top.
 // Answers are saved privately (lib/prefs.ts); the group only sees a "ready" checkmark.
 import { type ReactNode, type Ref, useCallback, useEffect, useImperativeHandle, useState } from "react";
+import { parseBudget } from "../../supabase/functions/_shared/budget.ts";
 import { useT } from "../i18n/hooks";
 import { EMPTY_PREFS, loadMyPrefs, mergePrefs, type Preferences, saveMyPrefs } from "../lib/prefs";
 import { VoiceFill } from "./VoiceFill";
@@ -47,13 +48,14 @@ export function Questionnaire({ memberId, intro, mic, onSaved, ref }: Props) {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const b = budgetText.trim() === "" ? null : Number(budgetText.replace(/[$,\s]/g, ""));
-    if (b !== null && (!Number.isFinite(b) || b < 0)) return setErr(t("q.budgetInvalid"));
+    // "25", "$25", "under $25", "25 bucks" all save as 25.
+    const b = budgetText.trim() === "" ? null : parseBudget(budgetText);
+    if (budgetText.trim() !== "" && b === null) return setErr(t("q.budgetInvalid"));
     setBusy(true);
     setErr(null);
     try {
       const next = {
-        budget: b === null ? null : Math.round(b),
+        budget: b,
         dietary: prefs.dietary.trim(),
         availability: prefs.availability.trim(),
         other: prefs.other.trim(),

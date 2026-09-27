@@ -11,6 +11,7 @@
 // hard rules. The server checks this and repairs the plan list (honorRequests), for Grok and backup plans alike.
 // Nothing stored on a plan names a member or reveals one person's budget or constraints.
 import type { CatalogItem } from "./logic.ts";
+import { lowestCapCents } from "./budget.ts";
 import { normalizePrefs, type Preferences } from "./preferences.ts";
 import { matchesRequest, requestKeysOf, requestKind } from "./requests.ts";
 
@@ -263,7 +264,6 @@ export function parseWindow(text: string): { from: number | null; until: number 
 
 // ------------------------------------------------------------------ needs + checks
 export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
-  const budgets = all.flatMap((p) => (p.budget === null ? [] : [Math.round(p.budget * 100)]));
   const windows = all.map((p) => parseWindow(p.availability));
   const froms = windows.flatMap((w) => w.from ?? []);
   const untils = windows.flatMap((w) => w.until ?? []);
@@ -273,7 +273,7 @@ export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
   if (windowFrom !== null && windowUntil !== null && windowUntil - windowFrom < 60) windowFrom = windowUntil = null;
   return {
     partySize: Math.max(1, partySize),
-    capCents: budgets.length ? Math.min(...budgets) : null,
+    capCents: lowestCapCents(all.map((p) => p.budget)),
     vegetarian: all.some((p) => VEG.test(p.dietary)),
     // Strict until settleGlutenFree() checks the catalog. Dietary is the main field; "other" catches "celiac" notes.
     glutenFree: all.some((p) => saysGlutenFree(p.dietary) || saysGlutenFree(p.other)) ? "strict" : "off",

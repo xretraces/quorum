@@ -186,6 +186,7 @@
   "final.share": "📤 공유",
   "final.pricesNote": "가격은 목록 기준 예상이에요.",
   "final.copied": "클립보드에 복사됨",
+  "final.linkCopied": "링크가 복사됐어요",
   "final.shareFailed": "이 브라우저에서는 공유할 수 없어요",
   "final.shareAbout": "1인 약 {price}",
   "final.stopN": "{n}번째 장소",

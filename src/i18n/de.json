@@ -186,6 +186,7 @@
   "final.share": "📤 Teilen",
   "final.pricesNote": "Preise sind Schätzungen aus dem Katalog.",
   "final.copied": "In die Zwischenablage kopiert",
+  "final.linkCopied": "Link kopiert",
   "final.shareFailed": "Teilen in diesem Browser nicht möglich",
   "final.shareAbout": "Ca. {price} pro Person",
   "final.stopN": "Stopp {n}",

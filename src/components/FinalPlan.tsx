@@ -1,12 +1,13 @@
 // "Your plan": the winning plan, shown live on every member's phone once the vote is decided. Real photos of the actual
 // places (same stored, credited photos and fallback order as the plan cards), itinerary, Add to calendar (.ics) and Share.
 // A Grok Imagine poster is optional: members can ask for one with "Make a Grok poster"; one already made is shown.
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { catalogEntry } from "../lib/booking";
 import { localStart } from "../i18n/format";
 import { useLanguage, useT } from "../i18n/hooks";
 import { usePlanTranslation } from "../i18n/usePlanTranslation";
 import { downloadIcs } from "../lib/calendar";
+import { copyText } from "../lib/invite";
 import { type Group, type Member, type Plan, usd } from "../lib/supabase";
 import { QuorumSays } from "./Grok";
 import { Recap } from "./Recap";
@@ -29,6 +30,8 @@ export function FinalPlan({ group, plan: original, members, painting, onMakePost
   const { plan, transitNotes, pending } = usePlanTranslation(original);
   const shimmer = pending ? "shimmer-text" : "";
   const [note, setNote] = useState<string | null>(null);
+  const noteTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(noteTimer.current), []);
   const votes = members.filter((m) => m.vote_plan_id === plan.id).length;
   const posterUrl = original.recap_image_url ?? group.recap_image_url;
   const showPoster = !!posterUrl || painting;
@@ -43,23 +46,30 @@ export function FinalPlan({ group, plan: original, members, painting, onMakePost
       t("final.shareAbout", { price: usd(plan.per_person_cents) }),
     ].join("\n");
   }
+  /** The group's page on this site: anyone with the link sees the plan. */
+  const shareUrl = () => `${window.location.origin}/g/${group.id}`;
+
+  // Native share sheet when there is one (phones, Safari); otherwise, or if it fails, copy the link and summary and
+  // say so in a toast. Closing the share sheet (AbortError) is not an error.
   async function share() {
+    const url = shareUrl();
     const body = text();
-    if (navigator.share) {
+    if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: plan.title, text: body });
+        await navigator.share({ title: `${group.name}: ${plan.title}`, text: body, url });
         return;
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
+        console.warn("navigator.share failed, copying the link instead", e);
       }
     }
-    try {
-      await navigator.clipboard.writeText(body);
-      setNote(t("final.copied"));
-    } catch {
-      setNote(t("final.shareFailed"));
-    }
-    setTimeout(() => setNote(null), 2000);
+    flash((await copyText(`${body}\n${url}`)) ? t("final.linkCopied") : t("final.shareFailed"));
+  }
+
+  function flash(msg: string) {
+    setNote(msg);
+    window.clearTimeout(noteTimer.current);
+    noteTimer.current = window.setTimeout(() => setNote(null), 2500);
   }
 
   return (
@@ -134,7 +144,15 @@ export function FinalPlan({ group, plan: original, members, painting, onMakePost
               {t("final.share")}
             </button>
           </div>
-          {note && <p className="mt-3 text-sm font-medium text-emerald-700">{note}</p>}
+          {note && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="fixed inset-x-4 bottom-[max(1.5rem,env(safe-area-inset-bottom))] z-50 mx-auto w-fit max-w-[calc(100%-2rem)] rounded-lg bg-navy px-4 py-3 text-center text-sm font-semibold text-white shadow-lg"
+            >
+              {note}
+            </div>
+          )}
           <p className="mt-3 text-xs text-navy/65">{t("final.pricesNote")}</p>
         </div>
       </div>
