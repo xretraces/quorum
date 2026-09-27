@@ -40,6 +40,7 @@ async function callGrok(userPayload: unknown, model: string, apiKey: string): Pr
       body: JSON.stringify({
         model,
         messages,
+        reasoning_effort: "low",
         response_format: {
           type: "json_schema",
           json_schema: { name: "plan_and_pay", schema: requestSchema, strict: true },
