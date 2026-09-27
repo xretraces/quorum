@@ -7,16 +7,10 @@ import type { Member, Payment, Plan, PlanItem, SimReason } from "./supabase";
 type CatalogEntry = {
   id: string; name: string; category: string; neighborhood: string; veg_friendly: boolean;
   duration_minutes?: number; transit_note?: string; dietary_note?: string;
-  /** Real venue photo in public/venues/ (Wikimedia Commons, free license) and its attribution. */
-  photo?: string; photoCredit?: { author: string; license: string; source: string };
 };
 const CATALOG = new Map((CATALOG_FILE.activities as unknown as CatalogEntry[]).map((c) => [c.id, c]));
 export const catalogEntry = (id: string) => CATALOG.get(id);
-/** Photo + credit + category for a catalog id (category picks the placeholder icon when there's no photo). */
-export const venuePhoto = (id: string) => {
-  const c = CATALOG.get(id);
-  return c && { photo: c.photo, photoCredit: c.photoCredit, category: c.category };
-};
+// Venue photos (real > stock > Grok Imagine) are picked in lib/venuePhotos.ts.
 
 const REF_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
 
