@@ -42,7 +42,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
               ))}
             </div>
           )}
-          <h3 className={`text-lg font-bold leading-tight text-gray-900 ${shimmer}`}>{plan.title}</h3>
+          <h3 className={`text-lg font-bold leading-tight text-gray-900 ${shimmer}`}><bdi>{plan.title}</bdi></h3>
         </div>
         <div className="shrink-0 text-end">
           <div className="text-xl font-bold text-indigo-600">{usd(plan.per_person_cents)}</div>
@@ -56,7 +56,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
             <span className="w-[4.5rem] shrink-0 text-gray-500">{localStart(it.start_time, lang).time}</span>
             <span className="min-w-0">
               <bdi className="font-medium text-gray-900">{it.name}</bdi>
-              {it.note && <span className={`block text-xs text-gray-500 ${shimmer}`}>{it.note}</span>}
+              {it.note && <bdi className={`block text-xs text-gray-500 ${shimmer}`}>{it.note}</bdi>}
             </span>
           </li>
         ))}
@@ -64,7 +64,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
 
       {plan.why_it_works && (
         <GrokSays label={t("plan.whyItFits")} tag={notGrok && <DemoPlanPill backup={plan.model === "backup"} />} className="rounded-xl bg-indigo-50 p-3">
-          <span className={shimmer}>{plan.why_it_works}</span>
+          <bdi className={shimmer}>{plan.why_it_works}</bdi>
         </GrokSays>
       )}
 
