@@ -1,4 +1,5 @@
-// Grok Imagine poster of the winning plan (recap-image, final screen only). While it's being made, or if it never arrives,
+// Optional Grok Imagine poster of the winning plan (recap-image, only when a member taps "Make a Grok poster" on the final
+// screen). While it's being made, or if it never arrives,
 // a gradient card with the plan's stops stands in, so the flow never waits on the image.
 import { Fragment, useState } from "react";
 import { useLanguage, useT } from "../i18n/hooks";
