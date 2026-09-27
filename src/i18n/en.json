@@ -128,6 +128,8 @@
   "photos.photo": "Photo",
   "photos.photos": "Photos",
   "photos.via": "via",
+  "photos.byGrokImagine": "Image by Grok Imagine",
+  "photos.aiAlt": "{name} (image by Grok Imagine)",
   "final.yourPlan": "Your plan 🎉",
   "final.votesLine": "{votes} of {total} voted for it · about {price} per person",
   "final.posterCredit": "✨ Your plan poster by Grok Imagine",

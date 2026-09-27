@@ -95,7 +95,7 @@ export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
 
       <label className={label}>
         {t("q.other")}
-        <textarea className={`${input} h-20 resize-none`} placeholder={t("q.noPreference")} value={prefs.other} onChange={(e) => set("other", e.target.value)} />
+        <textarea className={`${input} h-20 resize-none`} maxLength={1500} placeholder={t("q.noPreference")} value={prefs.other} onChange={(e) => set("other", e.target.value)} />
       </label>
 
       <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">

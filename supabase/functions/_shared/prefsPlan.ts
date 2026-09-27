@@ -2,8 +2,9 @@
 // Grok gets the answers anonymized ("Person 1"...), and the server re-checks every plan against the group's
 // hard rules: budget is a per-person cap, vegetarian/vegan answers require veg-friendly food, hard no's pulled
 // from "other" ("no bars", "I don't drink", "nothing outdoors") are exclusions, "I take MARTA" / "no car" means
-// transit only, and "free after 5pm" style availability becomes a shared time window. Anything that fails a
-// hard rule is dropped. The same rules drive the no-Grok backup plans.
+// transit only, "free after 5pm" style availability becomes a shared time window, and every stop must start and
+// end inside the venue's typical opening hours. Anything that fails a hard rule is dropped. The same rules drive
+// the no-Grok backup plans.
 // Nothing stored on a plan names a member or reveals one person's budget or constraints.
 import type { CatalogItem } from "./logic.ts";
 import { normalizePrefs, type Preferences } from "./preferences.ts";
@@ -15,7 +16,7 @@ export type GroupNeeds = {
   partySize: number;
   capCents: number | null; // lowest budget
   vegetarian: boolean;
-  transitOnly: boolean; // someone takes MARTA, the bus, or has no car (from "other")
+  transitOnly: boolean; // someone takes MARTA, the bus, or has no car (from "other"), unless they can rideshare
   windowFrom: number | null; // minutes after midnight, latest "free after" parsed from availability
   windowUntil: number | null; // earliest "free until"
   hardNoTerms: string[]; // from everyone's "other", expanded with synonyms (drink -> bar, brewery, ...)
@@ -35,7 +36,8 @@ export type PlanRow = {
 
 export const DAY = "Sat"; // no date on the questionnaire: plans are for the coming Saturday
 
-const VEG = /\b(vegetarian|vegan|veggie|plant[- ]based)\b/i;
+// Also catches common misspellings: "vegeterian", "vegitarian", "vegtarian".
+const VEG = /\b(veg\w*t[ae]r[iy]?an|vegan|veggie|plant[- ]based)\b/i;
 
 /** Stored jsonb -> Preferences with every key present. */
 export function readPrefs(raw: unknown): Preferences {
@@ -51,7 +53,9 @@ export function readPrefs(raw: unknown): Preferences {
 // ------------------------------------------------------------------ hard no's
 const NO_PREFIX = /^(?:i\s+)?(?:no|not|nothing|never|don'?t|won'?t|can'?t|avoid|hate|skip|without|anything)\b\s*(?:with|involving|like|that'?s|at|a|an|any|do|go|eat|want)?\s*/i;
 const DRINK = ["bar", "brewery", "beer", "cocktail", "wine", "alcohol"];
-const OUTDOOR = ["outdoor", "hike", "park", "picnic", "trail", "garden"];
+// No "park"/"garden": they hit indoor venues by name or tag (MLK National Historical Park, Atlanta History Center).
+// Outdoor venues still match through category/tag "outdoors"; "rooftop" keeps open-air Skyline Park out.
+const OUTDOOR = ["outdoor", "hike", "picnic", "trail", "rooftop"];
 const ALIASES: Record<string, string[]> = {
   drink: DRINK,
   drinks: DRINK,
@@ -92,6 +96,10 @@ const NOT_TERMS = new Set([
   "car", "cars", "drive", "driving", "preference", "preferences", "restriction", "restrictions", "problem", "problems",
   "worries", "idea", "sure", "picky", "way", "limit", "limits", "rush", "one",
 ]);
+/** Permission, not a hard no: "I don't mind bars", "no problem with outdoors", "fine with hikes". */
+const OK_WITH = /\b(?:(?:don'?t|dont|do not|wouldn'?t) mind|no (?:problem|issue|objection)s? with|(?:fine|ok|okay|cool) with|not (?:against|opposed to))\b/i;
+/** "No car but I can Uber": can still reach car-only places, so no transit-only rule. */
+const RIDESHARE = /\b(?:uber|lyft|rideshare|ride[- ]share|taxi|carpool|get a ride)\b/i;
 /** Getting-around words: set transitOnly, never a hard no. */
 export const TRANSIT = /\b(?:marta|transit|bus|train|no car|without a car|(?:don'?t|dont|doesn'?t|can'?t) (?:have a car|drive)|on foot)\b/i;
 
@@ -113,6 +121,7 @@ function cleanPiece(raw: string): string {
 export function hardNoPhrases(text: string, all = false): string[] {
   const out: string[] = [];
   for (const clause of unCurl(text).split(/[,;.!?\n]|\bbut\b/i)) {
+    if (!all && OK_WITH.test(clause)) continue;
     let rest = clause;
     if (all) rest = clause.trim().replace(NO_PREFIX, "");
     else {
@@ -207,7 +216,7 @@ export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
     partySize: Math.max(1, partySize),
     capCents: budgets.length ? Math.min(...budgets) : null,
     vegetarian: all.some((p) => VEG.test(p.dietary)),
-    transitOnly: all.some((p) => TRANSIT.test(unCurl(p.other))),
+    transitOnly: all.some((p) => TRANSIT.test(unCurl(p.other)) && !RIDESHARE.test(p.other)),
     windowFrom,
     windowUntil,
     hardNoTerms: [...new Set(all.flatMap((p) => hardNoTermsOf(p.other)))],
@@ -231,6 +240,21 @@ export const fmtTime = (min: number) => {
 
 const durationOf = (c: CatalogEntry) => c.duration_minutes ?? 90;
 
+/**
+ * Hours a stop can use, from typical_hours: "Daily ~11:00-21:00" -> 11:00-21:00; words only: "daylight" /
+ * "dawn-dusk" -> 07:00-20:00, "afternoons-late night" -> 12:00-24:00, "Thu-Sat evenings" -> 17:00-23:00.
+ * Null when there is nothing to go on: not enforced.
+ */
+function openHours(c: CatalogEntry): [number, number] | null {
+  const h = c.typical_hours;
+  const m = h.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
+  if (m) return [Number(m[1]) * 60 + Number(m[2]), Number(m[3]) * 60 + Number(m[4])];
+  if (/\b(?:daylight|dawn|dusk)\b/i.test(h)) return [7 * 60, 20 * 60];
+  if (/\bafternoons?\b/i.test(h)) return [12 * 60, 24 * 60];
+  if (/\bevenings?\b/i.test(h)) return [17 * 60, 23 * 60];
+  return null;
+}
+
 /** Why a plan breaks the group's hard rules (empty = fits everyone). Reasons are for server logs only. */
 export function violations(items: { c: CatalogEntry; start: number | null }[], needs: GroupNeeds): string[] {
   const out: string[] = [];
@@ -240,6 +264,8 @@ export function violations(items: { c: CatalogEntry; start: number | null }[], n
     if (needs.vegetarian && c.category === "food" && !c.veg_friendly) out.push(`${c.id}: not veg-friendly`);
     if (needs.transitOnly && !c.transit_friendly) out.push(`${c.id}: not reachable without a car`);
     if (hitsHardNo(c, needs.hardNoTerms)) out.push(`${c.id}: hard no`);
+    const open = openHours(c);
+    if (open && start !== null && (start < open[0] || start + durationOf(c) > open[1])) out.push(`${c.id}: closed then`);
     if (needs.windowFrom !== null || needs.windowUntil !== null) {
       if (start === null) out.push(`${c.id}: unreadable start time`);
       else {
@@ -427,8 +453,7 @@ const summaryOf = (cs: CatalogEntry[]) => `${cs.map(shortName).join(", then ")}.
 // ------------------------------------------------------------------ backup plans (no Grok)
 /** Opening hours from "Daily ~11:00-21:00"; unknown hours count as 10:00-22:00. */
 function hoursOf(c: CatalogEntry): [number, number] {
-  const m = c.typical_hours.match(/(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/);
-  return m ? [Number(m[1]) * 60 + Number(m[2]), Number(m[3]) * 60 + Number(m[4])] : [600, 1320];
+  return openHours(c) ?? [600, 1320];
 }
 
 const roundUp15 = (m: number) => Math.ceil(m / 15) * 15;
@@ -450,15 +475,20 @@ function schedule(cs: CatalogEntry[], needs: GroupNeeds): number[] | null {
 const areaWords = (c: CatalogEntry) => c.neighborhood.toLowerCase().split(/\s*\/\s*/);
 const sameArea = (a: CatalogEntry, b: CatalogEntry) => areaWords(a).some((w) => areaWords(b).includes(w));
 
+/** Shown to the whole group when the backup plans had to ignore the shared free time. Names no one. */
+export const WINDOW_RELAXED_NOTICE = "Nothing open fits everyone's free time, so these plans use different times.";
+
 /**
  * Deterministic plans from the catalog that pass every hard rule: an activity then a food stop (nearby pairs
  * first), else single stops. Picks up to 3 with no shared stops, always including the cheapest.
+ * `notice` is set when the time window had to be dropped.
  */
-export function backupPlans(catalog: CatalogEntry[], needs: GroupNeeds): PlanRow[] {
+export function backupPlans(catalog: CatalogEntry[], needs: GroupNeeds): { plans: PlanRow[]; notice: string | null } {
   const plans = backupPlansStrict(catalog, needs);
-  if (plans.length || (needs.windowFrom === null && needs.windowUntil === null)) return plans;
+  if (plans.length || (needs.windowFrom === null && needs.windowUntil === null)) return { plans, notice: null };
   // Nothing fits the clock window (e.g. "after 11pm"): drop only the window. Budget, food, transit and hard no's stay.
-  return backupPlansStrict(catalog, { ...needs, windowFrom: null, windowUntil: null });
+  const relaxed = backupPlansStrict(catalog, { ...needs, windowFrom: null, windowUntil: null });
+  return { plans: relaxed, notice: relaxed.length ? WINDOW_RELAXED_NOTICE : null };
 }
 
 function backupPlansStrict(catalog: CatalogEntry[], needs: GroupNeeds): PlanRow[] {
