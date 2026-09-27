@@ -1,7 +1,8 @@
 // Plans from the members' private questionnaire answers (make-plan). Pure code, no Deno APIs.
 // Grok gets the answers anonymized ("Person 1"...), and the server re-checks every plan against the group's
 // hard rules: budget is a per-person cap, vegetarian/vegan answers require veg-friendly food, hard no's pulled
-// from "other" ("no bars", "I don't drink", "nothing outdoors") are exclusions, "I take MARTA" / "no car" means
+// from "other" ("no bars", "I don't drink", "nothing outdoors") are exclusions, gluten-free / celiac / "GF" answers
+// require GF-friendly food (softened to a "check gluten-free options" line when too few GF food stops fit), "I take MARTA" / "no car" means
 // transit only, "free after 5pm" style availability becomes a shared time window, and every stop must start and
 // end inside the venue's typical opening hours. Anything that fails a hard rule is dropped. The same rules drive
 // the no-Grok backup plans.
@@ -9,13 +10,27 @@
 import type { CatalogItem } from "./logic.ts";
 import { normalizePrefs, type Preferences } from "./preferences.ts";
 
-export type CatalogEntry = CatalogItem & { duration_minutes?: number; transit_note?: string; tags?: string[] };
+export type CatalogEntry = CatalogItem & {
+  duration_minutes?: number;
+  transit_note?: string;
+  tags?: string[];
+  /** Food stops only: true when gluten-free options are documented (gf_note says where). Missing/false = not known. */
+  gf_friendly?: boolean;
+  gf_note?: string;
+};
+
+/**
+ * "strict": food stops must be gf_friendly (like vegetarian). "soft": someone is gluten-free but too few GF-friendly
+ * food stops fit the other rules, so any food is allowed and the plan text says to check gluten-free options.
+ */
+export type GlutenFreeMode = "off" | "strict" | "soft";
 
 /** What the whole group needs, merged from everyone's answers. Never stored or sent to a browser. */
 export type GroupNeeds = {
   partySize: number;
   capCents: number | null; // lowest budget
   vegetarian: boolean;
+  glutenFree: GlutenFreeMode; // see settleGlutenFree
   transitOnly: boolean; // someone takes MARTA, the bus, or has no car (from "other"), unless they can rideshare
   windowFrom: number | null; // minutes after midnight, latest "free after" parsed from availability
   windowUntil: number | null; // earliest "free until"
@@ -38,6 +53,20 @@ export const DAY = "Sat"; // no date on the questionnaire: plans are for the com
 
 // Also catches common misspellings: "vegeterian", "vegitarian", "vegtarian".
 const VEG = /\b(veg\w*t[ae]r[iy]?an|vegan|veggie|plant[- ]based)\b/i;
+
+// Gluten-free, loosely spelled: "gluten free", "gluten-free", "glutenfree", "glutten fre", "GF", "celiac", "coeliac",
+// "no gluten", "can't have gluten", "gluten intolerant", "gluten allergy".
+const GLUTEN = String.raw`glu+t+[aeiou]?n`;
+export const GLUTEN_FREE = new RegExp(
+  String.raw`\b(?:co?eliac|gf|${GLUTEN}[\s-]*fr+e+e?|(?:no|zero|avoid|avoiding|without|non|can'?t (?:have|eat|do)|allergic to|intolerant to|sensitive to)[\s-]+${GLUTEN}|${GLUTEN}[\s-]*(?:intoleran\w*|allerg\w*|sensitiv\w*))\b`,
+  "i",
+);
+
+/** Fewer GF-friendly food stops than this (after budget, veg, transit and hard no's) -> "soft" gluten-free mode. */
+export const MIN_GF_FOOD = 2;
+
+/** Shown in plan text in "soft" mode. Group-level, names no one. */
+export const GF_CHECK_NOTE = "Check gluten-free options with the venue before you go.";
 
 /** Stored jsonb -> Preferences with every key present. */
 export function readPrefs(raw: unknown): Preferences {
@@ -216,12 +245,35 @@ export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
     partySize: Math.max(1, partySize),
     capCents: budgets.length ? Math.min(...budgets) : null,
     vegetarian: all.some((p) => VEG.test(p.dietary)),
+    // Strict until settleGlutenFree() checks the catalog. Dietary is the main field; "other" catches "celiac" notes.
+    glutenFree: all.some((p) => GLUTEN_FREE.test(unCurl(`${p.dietary} ${p.other}`))) ? "strict" : "off",
     transitOnly: all.some((p) => TRANSIT.test(unCurl(p.other)) && !RIDESHARE.test(p.other)),
     windowFrom,
     windowUntil,
     hardNoTerms: [...new Set(all.flatMap((p) => hardNoTermsOf(p.other)))],
     anyTimes: all.some((p) => p.availability.trim().length > 0),
   };
+}
+
+/**
+ * Keeps gluten-free "strict" only if at least MIN_GF_FOOD GF-friendly food stops also pass budget, veg, transit and
+ * hard no's. Otherwise "soft": food isn't filtered on gluten (so plans keep a food stop) and plan text says to check.
+ */
+export function settleGlutenFree(needs: GroupNeeds, catalog: CatalogEntry[]): GroupNeeds {
+  if (needs.glutenFree !== "strict") return needs;
+  const fits = catalog.filter((c) =>
+    c.category === "food" && c.gf_friendly === true &&
+    (!needs.vegetarian || c.veg_friendly) &&
+    (!needs.transitOnly || c.transit_friendly) &&
+    (needs.capCents === null || c.price_per_person_cents <= needs.capCents) &&
+    !hitsHardNo(c, needs.hardNoTerms)
+  );
+  return fits.length >= MIN_GF_FOOD ? needs : { ...needs, glutenFree: "soft" };
+}
+
+/** In "soft" mode, a plan with a food stop that isn't GF-friendly must tell the group to check. */
+export function needsGfCheck(needs: GroupNeeds, items: CatalogEntry[]): boolean {
+  return needs.glutenFree === "soft" && items.some((c) => c.category === "food" && c.gf_friendly !== true);
 }
 
 /** "Sat 2:00 PM" / "2 PM" / "14:00" -> minutes after midnight, or null. */
@@ -262,6 +314,7 @@ export function violations(items: { c: CatalogEntry; start: number | null }[], n
   if (needs.capCents !== null && price > needs.capCents) out.push("over budget");
   for (const { c, start } of items) {
     if (needs.vegetarian && c.category === "food" && !c.veg_friendly) out.push(`${c.id}: not veg-friendly`);
+    if (needs.glutenFree === "strict" && c.category === "food" && c.gf_friendly !== true) out.push(`${c.id}: not gluten-free-friendly`);
     if (needs.transitOnly && !c.transit_friendly) out.push(`${c.id}: not reachable without a car`);
     if (hitsHardNo(c, needs.hardNoTerms)) out.push(`${c.id}: hard no`);
     const open = openHours(c);
@@ -293,6 +346,7 @@ export function whyItFits(needs: GroupNeeds, items: CatalogEntry[]): string {
   const parts: string[] = [];
   if (needs.capCents !== null) parts.push("under everyone's budget");
   if (needs.vegetarian && items.some((c) => c.category === "food")) parts.push("vegetarian-friendly food");
+  if (needs.glutenFree === "strict" && items.some((c) => c.category === "food")) parts.push("gluten-free options");
   if (needs.transitOnly) parts.push("reachable by MARTA");
   if (needs.windowFrom !== null || needs.windowUntil !== null) parts.push("fits everyone's free time");
   if (needs.hardNoTerms.length) parts.push("skips everyone's hard no's");
@@ -355,8 +409,10 @@ HARD RULES (a plan that breaks one is thrown away):
 - The sum of price_per_person_cents of a plan's items must be <= group_rules.max_per_person_cents (when not null). Free items count.
 - Never include anything matching anyone's hard no's: group_rules.hard_no_terms, plus any "no X", "I don't X", "nothing X", "hate X" or "allergic to X" in a person's "other" text. Read them generously: "no heights" excludes rooftops and summits, "I don't drink" excludes bars, breweries and wine or cocktail spots, "nothing outdoors" excludes parks, hikes and picnics.
 - If group_rules.vegetarian_food_only, every food item must have veg_friendly = true.
+- If group_rules.gluten_free_food_only, every food item must have gf_friendly = true (items that are not food are fine).
 - If group_rules.transit_only, every item must have transit_friendly = true.
 - If group_rules.time_window is set, every item must start at or after "from" and end (start + duration_minutes) by "until". Respect typical_hours.
+If group_rules.gluten_free_check_note, gluten-free food options are limited: any food item is allowed, but the summary of every plan with a food item that lacks gf_friendly = true must tell the group to check gluten-free options with the venue.
 SOFT: honor each person's dietary text and availability in their own words, plus "other" notes, and variety (e.g. a free/cheap plan, a food-focused one, something special). Only group_rules.time_window is a hard clock window; the rest of the availability text is soft. A null budget, dietary, availability, or other means that person has no preference for it. Do not invent a limit or restriction for a null field.
 start_time format: "${DAY} 2:00 PM". Leave a little travel time between stops.
 PRIVACY (everyone in the group reads these plans): never mention any person, "Person N", a name, a dollar amount, or one person's constraint. Never write "someone", "one of you" or similar. why_it_fits is ONE short line about the group as a whole, e.g. "Under everyone's budget, vegetarian and gluten-free options, reachable by MARTA". Item notes describe the place, not people.
@@ -383,14 +439,16 @@ export function grokPayload(all: Preferences[], needs: GroupNeeds, catalog: Cata
     group_rules: {
       max_per_person_cents: needs.capCents,
       vegetarian_food_only: needs.vegetarian,
+      gluten_free_food_only: needs.glutenFree === "strict",
+      gluten_free_check_note: needs.glutenFree === "soft",
       transit_only: needs.transitOnly,
       time_window: needs.windowFrom !== null || needs.windowUntil !== null
         ? { from: hhmm(needs.windowFrom), until: hhmm(needs.windowUntil) }
         : null,
       hard_no_terms: needs.hardNoTerms,
     },
-    catalog: catalog.map(({ id, name, category, neighborhood, price_per_person_cents, veg_friendly, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note }) => ({
-      id, name, category, neighborhood, price_per_person_cents, veg_friendly, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note,
+    catalog: catalog.map(({ id, name, category, neighborhood, price_per_person_cents, veg_friendly, gf_friendly, gf_note, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note }) => ({
+      id, name, category, neighborhood, price_per_person_cents, veg_friendly, gf_friendly, gf_note, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note,
     })),
   };
 }
@@ -418,7 +476,7 @@ export function normalizeGrokPlans(
     const cs = items.map((i) => i.c);
     out.push(toRow(out.length, {
       title: leaksPrivate(p.title, names) ? titleOf(cs) : p.title.trim(),
-      summary: leaksPrivate(p.summary, names) ? summaryOf(cs) : p.summary.trim(),
+      summary: withGfCheck(leaksPrivate(p.summary, names) ? summaryOf(cs) : p.summary.trim(), needs, cs),
       items: items.map(({ c, it }) => ({ c, start_time: it.start_time, note: leaksPrivate(it.note, names) ? "" : it.note.trim() })),
       why: p.why_it_fits.trim() && !leaksPrivate(p.why_it_fits, names) ? p.why_it_fits.trim() : whyItFits(needs, cs),
     }, needs));
@@ -444,6 +502,12 @@ function toRow(
     fits_everyone: true, // only plans that pass every hard rule get here
     why_it_works: p.why,
   };
+}
+
+/** Appends GF_CHECK_NOTE when needsGfCheck() and the text doesn't already mention gluten. */
+function withGfCheck(text: string, needs: GroupNeeds, cs: CatalogEntry[]): string {
+  if (!needsGfCheck(needs, cs) || /gluten/i.test(text)) return text;
+  return text ? `${text.replace(/\s+$/, "")} ${GF_CHECK_NOTE}` : GF_CHECK_NOTE;
 }
 
 const shortName = (c: CatalogEntry) => c.name.replace(/\s*\(.*\)$/, "").replace(/^Atlanta BeltLine /, "BeltLine ");
@@ -519,7 +583,7 @@ function backupPlansStrict(catalog: CatalogEntry[], needs: GroupNeeds): PlanRow[
   return picked.map((c, i) =>
     toRow(i, {
       title: titleOf(c.cs),
-      summary: summaryOf(c.cs),
+      summary: withGfCheck(summaryOf(c.cs), needs, c.cs),
       items: c.cs.map((x, j) => ({ c: x, start_time: fmtTime(c.starts[j]), note: x.transit_note ?? "" })),
       why: whyItFits(needs, c.cs),
     }, needs)
