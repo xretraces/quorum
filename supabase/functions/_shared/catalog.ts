@@ -4,7 +4,7 @@ export const CATALOG_FILE = {
   "version": "2026-09-26",
   "city": "Atlanta, GA",
   "currency": "usd",
-  "photos_note": "photo = 800px JPG in public/venues/ from Wikimedia Commons (free licenses only); photoCredit = author, license, Commons file page. Venues without a free photo get a gradient placeholder in the UI.",
+  "photos_note": "photo = 800px JPG in public/venues/ from Wikimedia Commons or Flickr via Openverse (CC BY / CC BY-SA / CC0 / public domain only); photoCredit = author, license, Commons file page. Venues without a free photo get a gradient placeholder in the UI.",
   "activities": [
     {
       "id": "ponce-city-market-food-hall",
@@ -334,7 +334,13 @@ export const CATALOG_FILE = {
       "tags": [
         "bbq",
         "texas-style"
-      ]
+      ],
+      "photo": "/venues/fox-bros-bbq.jpg",
+      "photoCredit": {
+        "author": "Nathan Cardozo",
+        "license": "CC BY-SA 2.0",
+        "source": "https://www.flickr.com/photos/55298075@N00/2828314225"
+      }
     },
     {
       "id": "busy-bee-cafe",
@@ -372,7 +378,13 @@ export const CATALOG_FILE = {
       "tags": [
         "vegan",
         "local"
-      ]
+      ],
+      "photo": "/venues/tassilis-raw-reality.jpg",
+      "photoCredit": {
+        "author": "Carl Black",
+        "license": "CC BY-SA 2.0",
+        "source": "https://www.flickr.com/photos/8198029@N03/7638830838"
+      }
     },
     {
       "id": "buford-highway-food-crawl",

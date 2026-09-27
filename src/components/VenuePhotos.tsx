@@ -1,5 +1,5 @@
 // Real photos of a plan's stops on the voting cards: the first stop big, the other stops as small thumbnails,
-// and a tiny credit line. Photos are freely licensed Wikimedia Commons images served from public/venues/ (see
+// and a tiny credit line. Photos are freely licensed (Wikimedia Commons / Flickr) images served from public/venues/ (see
 // data/atlanta-activities.json `photo` / `photoCredit`). A stop without a photo gets a gradient + category icon.
 // Grok Imagine is only used for the winning plan's poster (Recap on the final screen).
 import { useState } from "react";
@@ -54,7 +54,7 @@ export function VenuePhotos({ items }: { items: PlanItem[] }) {
               <a href={c!.source} target="_blank" rel="noopener noreferrer" className="hover:underline">{c!.author} / {c!.license}</a>
             </span>
           ))}{" "}
-          via Wikimedia Commons
+          via {[...new Set(credits.map((c) => (c!.source.includes("flickr.com") ? "Flickr" : "Wikimedia Commons")))].join(" & ")}
         </p>
       )}
     </div>
