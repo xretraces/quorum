@@ -1,12 +1,11 @@
 // "Your groups" on the home screen: every group this device created or joined, newest activity first.
-// One PostgREST query returns each group with its member count and latest message; Realtime keeps it fresh.
+// One PostgREST query returns each group with its member count; Realtime keeps it fresh.
 import { useCallback, useEffect, useState } from "react";
 import { forgetGroup, myGroupIds, statusBadge, supabase } from "../lib/supabase";
 
 type Row = {
   id: string; name: string; status: string; created_at: string;
   members: { count: number }[];
-  messages: { sender_name: string; text: string; created_at: string }[];
 };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -21,7 +20,7 @@ function ago(iso: string) {
   return rtf.format(Math.round(s / 60), "minute");
 }
 
-const activityOf = (g: Row) => g.messages[0]?.created_at ?? g.created_at;
+const activityOf = (g: Row) => g.created_at;
 
 export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
   const [ids, setIds] = useState(() => myGroupIds());
@@ -38,10 +37,8 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
     }
     const { data, error } = await supabase
       .from("groups")
-      .select("id,name,status,created_at,members(count),messages(sender_name,text,created_at)")
-      .in("id", valid)
-      .order("created_at", { referencedTable: "messages", ascending: false })
-      .limit(1, { referencedTable: "messages" });
+      .select("id,name,status,created_at,members(count)")
+      .in("id", valid);
     if (error) return console.error("Couldn't load your groups", error); // keep the last good list and the stored ids
     const rows = data as Row[];
     const found = new Set(rows.map((g) => g.id));
@@ -71,7 +68,6 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
     const channel = supabase
       .channel(`your-groups-${key}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "groups", filter: `id=${inList}` }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `group_id=${inList}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "members", filter: `group_id=${inList}` }, load)
       .subscribe();
     return () => {
@@ -90,7 +86,6 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
         <ul className="divide-y divide-gray-100">
           {groups.map((g) => {
             const s = statusBadge(g.status);
-            const last = g.messages[0];
             const count = g.members[0]?.count ?? 0;
             return (
               <li key={g.id}>
@@ -103,19 +98,10 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
                       <span className="truncate font-semibold text-gray-900">{g.name}</span>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}>{s.label}</span>
                     </div>
-                    <p className="mt-0.5 truncate text-sm text-gray-500">
-                      {last ? (
-                        <>
-                          <span className="font-medium text-gray-700">{last.sender_name}:</span> {last.text}
-                        </>
-                      ) : (
-                        "No messages yet"
-                      )}
-                    </p>
+                    <p className="mt-0.5 truncate text-sm text-gray-500">{count} {count === 1 ? "person" : "people"}</p>
                   </div>
                   <div className="shrink-0 text-right text-xs text-gray-500">
                     <div>{ago(activityOf(g))}</div>
-                    <div className="mt-0.5">👥 {count}</div>
                   </div>
                 </button>
               </li>

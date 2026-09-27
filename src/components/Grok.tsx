@@ -1,4 +1,4 @@
-// Grok as a member of the group chat: a dark avatar with a sparkle mark, and an attributed "Grok says" line
+// Grok's look: a dark avatar with a sparkle mark, and an attributed "Grok says" line
 // (design-refs/chat/02 and 18: AI lines look different from people's bubbles).
 import type { ReactNode } from "react";
 
@@ -17,13 +17,18 @@ export function GrokAvatar({ size = 24 }: { size?: number }) {
   );
 }
 
-export function DemoPlanPill() {
+/** Pill on plans Grok didn't write: "backup" = make-plan's catalog picks from everyone's answers; else saved demo plans. */
+export function DemoPlanPill({ backup = false }: { backup?: boolean }) {
   return (
     <span
-      title="Grok didn't answer, so these are saved plans for this chat. Budgets are still checked."
+      title={
+        backup
+          ? "Grok didn't answer, so Quorum picked these from the catalog using everyone's answers."
+          : "Grok couldn't be reached, so these are saved demo plans."
+      }
       className="inline-block shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800"
     >
-      Demo plan
+      {backup ? "Backup plan" : "Demo plan"}
     </span>
   );
 }
