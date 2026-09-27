@@ -100,7 +100,7 @@ export function Questionnaire({ memberId, intro, mic, onSaved, ref }: Props) {
       <label className={`${label} q-paper block`}>
         {t("q.other")}
         <textarea className={`${input} h-24 resize-none`} maxLength={1500} placeholder={t("q.noPreference")} value={prefs.other} onChange={(e) => set("other", e.target.value)} />
-        <span className="mt-2 block text-sm font-normal text-navy/55">{t("q.blankHint")}</span>
+        <span className="mt-2 block text-sm font-normal text-navy/70">{t("q.blankHint")}</span>
       </label>
 
       <div className="pt-2">

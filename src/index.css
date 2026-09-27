@@ -40,7 +40,7 @@ body,
     @apply font-logo text-lg leading-snug font-bold tracking-tight text-navy;
   }
   .q-eyebrow {
-    @apply inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] text-navy/60 uppercase before:h-2 before:w-2 before:shrink-0 before:bg-sun before:content-[''];
+    @apply inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] text-navy/70 uppercase before:h-2 before:w-2 before:shrink-0 before:bg-sun before:content-[''];
   }
   .q-muted {
     @apply text-sm leading-relaxed text-navy/70;
@@ -49,7 +49,7 @@ body,
     @apply block text-sm font-bold text-navy;
   }
   .q-input {
-    @apply min-h-12 w-full rounded-lg border-2 border-navy/25 bg-white px-4 py-3 text-base text-navy transition-[border-color,box-shadow] placeholder:text-navy/40 focus:border-navy focus:shadow-[3px_3px_0_0_var(--color-spring-deep)] focus:outline-none;
+    @apply min-h-12 w-full rounded-lg border-2 border-navy/25 bg-white px-4 py-3 text-base text-navy transition-[border-color,box-shadow] placeholder:text-navy/55 focus:border-navy focus:shadow-[3px_3px_0_0_var(--color-spring-deep)] focus:outline-none;
   }
   .q-btn {
     @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-navy px-5 text-base font-bold transition-[transform,box-shadow,background-color] duration-100 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-spring-deep;
@@ -70,7 +70,7 @@ body,
   .q-btn:disabled,
   .q-btn:disabled:hover,
   .q-btn:disabled:active {
-    @apply translate-0 cursor-not-allowed border-dashed border-navy/30 bg-navy/[0.03] text-navy/45 shadow-none;
+    @apply translate-0 cursor-not-allowed border-dashed border-navy/30 bg-navy/[0.03] text-navy/65 shadow-none;
   }
   .q-tag {
     @apply inline-flex shrink-0 items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[11px] leading-4 font-bold tracking-wider uppercase;
@@ -91,7 +91,7 @@ body,
     @apply rounded-xl bg-white px-6 py-6 shadow-[0_1px_2px_rgb(22_78_114/0.05),0_10px_28px_-18px_rgb(22_78_114/0.28)];
   }
   .q-form-input {
-    @apply mt-2 w-full border-0 border-b border-navy/20 bg-transparent px-0 py-2.5 text-base text-navy placeholder:text-navy/40 focus:border-spring-deep focus:ring-0 focus:outline-none;
+    @apply mt-2 w-full border-0 border-b border-navy/20 bg-transparent px-0 py-2.5 text-base text-navy placeholder:text-navy/55 focus:border-spring-deep focus:ring-0 focus:outline-none;
   }
 }
 

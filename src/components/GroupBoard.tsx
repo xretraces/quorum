@@ -266,7 +266,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
               memberId={me.id}
               intro={
                 <header className="q-paper">
-                  <p className="break-words text-sm font-semibold text-navy/55">{tNodes("answers.backTo", { group: iso(group.name) })}</p>
+                  <p className="break-words text-sm font-semibold text-navy/70">{tNodes("answers.backTo", { group: iso(group.name) })}</p>
                   <h1 className="font-logo mt-2 text-3xl leading-[1.05] font-bold tracking-tight text-navy sm:text-4xl">
                     {t("lobby.yourAnswers")}
                   </h1>

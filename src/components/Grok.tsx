@@ -53,7 +53,7 @@ export function GrokSays({ label, tag, children, className = "" }: { label?: str
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-center gap-x-1.5 text-xs leading-[22px]">
           <b className="font-logo font-bold text-navy">Grok</b>
-          {label && <span className="text-navy/55">{label}</span>}
+          {label && <span className="text-navy/70">{label}</span>}
           {tag}
         </p>
         <div className="text-sm text-navy/85">{children}</div>

@@ -57,7 +57,7 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
 
   return (
     <section ref={ref} aria-live="polite" className="mx-auto w-full max-w-xl text-center">
-      <p className="inline-flex items-center gap-2 text-sm font-semibold text-navy/55">
+      <p className="inline-flex items-center gap-2 text-sm font-semibold text-navy/70">
         <GrokAvatar size={22} />
         <b className="font-logo font-bold text-navy">Grok</b>
         <span aria-hidden>·</span>
@@ -72,8 +72,8 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
           </span>
         )}
       </p>
-      <p className="mt-3 font-mono text-sm tabular-nums text-navy/45">{clock}</p>
-      {!isMine && !allDone && <p className="mt-2 text-sm text-navy/55">{tNodes("working.askedBy", { name: iso(run.by) })}</p>}
+      <p className="mt-3 font-mono text-sm tabular-nums text-navy/65">{clock}</p>
+      {!isMine && !allDone && <p className="mt-2 text-sm text-navy/70">{tNodes("working.askedBy", { name: iso(run.by) })}</p>}
 
       <ol className="mx-auto mt-8 w-fit space-y-2.5 text-start">
         {STEPS.map((label, i) => {
@@ -81,7 +81,7 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
           return (
             <li key={label} className="flex items-center gap-3">
               {state === "done" ? (
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-xs font-bold text-white motion-safe:animate-pop">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-xs font-bold text-white motion-safe:animate-pop">
                   ✓
                 </span>
               ) : state === "active" ? (
@@ -93,7 +93,7 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
               )}
               <span
                 className={`text-sm transition-colors ${
-                  state === "done" ? "text-navy/75" : state === "active" ? "font-semibold text-navy" : "text-navy/40"
+                  state === "done" ? "text-navy/75" : state === "active" ? "font-semibold text-navy" : "text-navy/70"
                 }`}
               >
                 {t(label)}
@@ -111,7 +111,7 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
       </div>
 
       {!allDone && (
-        <p className="mx-auto mt-3 max-w-sm text-sm text-navy/55">
+        <p className="mx-auto mt-3 max-w-sm text-sm text-navy/70">
           {elapsedS > SLOW_AFTER_S
             ? t("working.slow")
             : t("working.usual")}

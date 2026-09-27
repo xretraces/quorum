@@ -50,15 +50,15 @@ export const forgetGroup = (groupId: string) => localStorage.removeItem(`${MEMBE
 const STATUS: Record<string, { label: string; cls: string }> = { // UI shows t(`status.${status}`) (src/i18n)
   planning: { label: "Lobby", cls: "bg-spring text-navy" },
   voting: { label: "Voting", cls: "bg-sun text-navy" },
-  decided: { label: "Decided", cls: "bg-emerald-500 text-white" },
+  decided: { label: "Decided", cls: "bg-emerald-600 text-white" },
   holding: { label: "Locked", cls: "bg-navy text-white" },
-  captured: { label: "Booked", cls: "bg-emerald-500 text-white" },
-  partially_captured: { label: "Partly booked", cls: "bg-emerald-500 text-white" },
-  cancelled: { label: "Cancelled", cls: "bg-navy/10 text-navy/60" },
+  captured: { label: "Booked", cls: "bg-emerald-600 text-white" },
+  partially_captured: { label: "Partly booked", cls: "bg-emerald-600 text-white" },
+  cancelled: { label: "Cancelled", cls: "bg-navy/10 text-navy/70" },
 };
 /** User-facing label + Tailwind colors for groups.status. */
 export const statusBadge = (status: string) => ({
-  ...(STATUS[status] ?? { label: status, cls: "bg-navy/10 text-navy/60" }),
+  ...(STATUS[status] ?? { label: status, cls: "bg-navy/10 text-navy/70" }),
   labelKey: `status.${status}`,
 });
 

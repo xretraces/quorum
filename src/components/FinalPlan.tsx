@@ -59,11 +59,11 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
             painting={painting}
             className="aspect-[16/10] lg:aspect-auto lg:min-h-full lg:flex-1"
           />
-          <p className="mt-2 text-[11px] text-navy/45">{t("final.posterCredit")}</p>
+          <p className="mt-2 text-[11px] text-navy/65">{t("final.posterCredit")}</p>
         </div>
 
         <div className="w-full max-w-xs lg:w-80 lg:max-w-none">
-          <p className="text-sm font-semibold text-navy/55">{t("final.yourPlan")}</p>
+          <p className="text-sm font-semibold text-navy/70">{t("final.yourPlan")}</p>
           <h2 className={`font-logo mt-2 text-3xl leading-[1.1] font-bold tracking-tight text-navy ${pending ? "motion-safe:animate-pulse" : ""}`}><bdi>{plan.title}</bdi></h2>
           <p className="mt-2 text-sm text-navy/70">
             {t("final.votesLine", { votes, total: members.length, price: usd(plan.per_person_cents) })}
@@ -86,9 +86,9 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
                   </div>
                   <div className="min-w-0 flex-1 pb-5">
                     <p className="font-semibold text-navy"><bdi>{it.name}</bdi></p>
-                    {c && <p className="text-xs text-navy/60">{c.neighborhood}{c.duration_minutes ? t("final.aboutMinutes", { minutes: c.duration_minutes }) : ""}</p>}
-                    {it.note && <p className={`text-xs text-navy/60 ${shimmer}`}><bdi>{it.note}</bdi></p>}
-                    {transitNotes[i] && <p className={`mt-0.5 text-xs text-navy/45 ${shimmer}`}>🚇 {transitNotes[i]}</p>}
+                    {c && <p className="text-xs text-navy/70">{c.neighborhood}{c.duration_minutes ? t("final.aboutMinutes", { minutes: c.duration_minutes }) : ""}</p>}
+                    {it.note && <p className={`text-xs text-navy/70 ${shimmer}`}><bdi>{it.note}</bdi></p>}
+                    {transitNotes[i] && <p className={`mt-0.5 text-xs text-navy/65 ${shimmer}`}>🚇 {transitNotes[i]}</p>}
                   </div>
                 </li>
               );
@@ -110,7 +110,7 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
             </button>
           </div>
           {note && <p className="mt-3 text-sm font-medium text-emerald-700">{note}</p>}
-          <p className="mt-3 text-xs text-navy/45">{t("final.pricesNote")}</p>
+          <p className="mt-3 text-xs text-navy/65">{t("final.pricesNote")}</p>
         </div>
       </div>
     </section>

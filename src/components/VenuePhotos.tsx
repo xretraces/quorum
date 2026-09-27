@@ -76,7 +76,7 @@ export function VenuePhotos({ items }: { items: PlanItem[] }) {
         </div>
       </div>
       {parts.length > 0 && (
-        <p data-testid="photo-credits" className="mt-1 px-1 text-[10px] leading-snug text-navy/40">
+        <p data-testid="photo-credits" className="mt-1 px-1 text-[10px] leading-snug text-navy/70">
           {parts.map((p, k) => (
             <span key={k}>
               {k > 0 && " · "}

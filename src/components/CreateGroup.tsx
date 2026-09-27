@@ -8,7 +8,7 @@ import { HangMascots } from "./HangMascots";
 import { QuorumHeader } from "./QuorumHeader";
 import { YourGroups } from "./YourGroups";
 
-const field = "q-input border-navy/40 bg-white/85 placeholder:text-navy/45 focus:bg-white";
+const field = "q-input border-navy/40 bg-white/85 placeholder:text-navy/65 focus:bg-white";
 
 type Props = { onCreated: (groupId: string) => void; onJoinCode: (code: string) => void; onOpen: (groupId: string) => void };
 

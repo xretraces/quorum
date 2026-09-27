@@ -46,17 +46,17 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
         </div>
         <div className="shrink-0 text-end">
           <div className="font-logo text-2xl leading-none font-bold tracking-tight text-navy">{usd(plan.per_person_cents)}</div>
-          <div className="mt-1 text-[11px] font-medium text-navy/50">{t("plan.perPerson")}</div>
+          <div className="mt-1 text-[11px] font-medium text-navy/65">{t("plan.perPerson")}</div>
         </div>
       </div>
 
       <ol className="space-y-2">
         {plan.items.map((it, i) => (
           <li key={i} className="flex gap-3 text-sm">
-            <span className="w-[4.5rem] shrink-0 font-semibold tabular-nums text-navy/55">{localStart(it.start_time, lang).time}</span>
+            <span className="w-[4.5rem] shrink-0 font-semibold tabular-nums text-navy/70">{localStart(it.start_time, lang).time}</span>
             <span className="min-w-0">
               <bdi className="font-semibold text-navy">{it.name}</bdi>
-              {it.note && <bdi className={`block text-xs text-navy/60 ${shimmer}`}>{it.note}</bdi>}
+              {it.note && <bdi className={`block text-xs text-navy/70 ${shimmer}`}>{it.note}</bdi>}
             </span>
           </li>
         ))}
@@ -80,7 +80,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
           {voters.length}/{memberCount}
         </span>
       </div>
-      {voters.length > 0 && <p className="text-xs text-navy/60">{tNodes("plan.votersIn", { names: isoList(voters.map((v) => v.display_name), t("common.listSep")) })}</p>}
+      {voters.length > 0 && <p className="text-xs text-navy/70">{tNodes("plan.votersIn", { names: isoList(voters.map((v) => v.display_name), t("common.listSep")) })}</p>}
       {onPick && (
         <button
           disabled={busy}

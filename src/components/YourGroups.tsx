@@ -104,7 +104,7 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
                     </div>
                     <p className="mt-0.5 truncate text-sm text-navy/70">{t("groups.people", { count })}</p>
                   </div>
-                  <div className="shrink-0 text-end text-xs text-navy/60">
+                  <div className="shrink-0 text-end text-xs text-navy/70">
                     <div>{ago(activityOf(g), lang, t)}</div>
                   </div>
                 </button>

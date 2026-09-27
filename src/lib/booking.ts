@@ -152,7 +152,7 @@ export const initials = (name: string) => {
   return out || Array.from(name.trim())[0] || "?";
 };
 
-const AVATAR_COLORS = ["bg-navy", "bg-spring-deep", "bg-emerald-500", "bg-amber-500", "bg-rose-400", "bg-sky-600"];
+const AVATAR_COLORS = ["bg-navy", "bg-spring-deep", "bg-emerald-600", "bg-amber-600", "bg-rose-500", "bg-sky-600"];
 export function avatarColor(name: string) {
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;

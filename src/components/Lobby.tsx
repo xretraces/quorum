@@ -91,7 +91,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
         <div className="mx-auto mt-6 w-56 bg-white p-3 sm:w-64">
           <QRCodeSVG value={inviteUrl} size={512} marginSize={1} bgColor="#ffffff" fgColor="#164e72" className="block h-auto w-full" title={t("lobby.qrTitle", { group: group.name })} />
         </div>
-        <p className="mx-auto mt-4 max-w-xl break-all font-mono text-sm text-navy/50" title={inviteUrl}>{inviteUrl}</p>
+        <p className="mx-auto mt-4 max-w-xl break-all font-mono text-sm text-navy/65" title={inviteUrl}>{inviteUrl}</p>
         <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
           <button onClick={copy} className="q-btn q-btn-secondary min-h-11 px-5 text-sm">
             {t("lobby.copyLink")}
@@ -107,7 +107,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
         <section className="w-full min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="q-h2 text-xl">{t("lobby.whosIn", { count: members.length })}</h2>
-            <span className="text-xs font-bold tabular-nums text-navy/55">{t("lobby.readyCount", { ready, total: members.length })}</span>
+            <span className="text-xs font-bold tabular-nums text-navy/70">{t("lobby.readyCount", { ready, total: members.length })}</span>
           </div>
           <ReadyMeter ready={ready} total={members.length} />
           <ul className="mt-2 divide-y divide-navy/10">
@@ -120,8 +120,8 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
                     (truncating the whole RTL row cut the name's first letters), and the creator / you tags stay visible. */}
                 <span className="flex min-w-0 flex-1 items-baseline text-sm font-semibold text-navy">
                   <bdi className="min-w-0 truncate">{m.display_name}</bdi>
-                  {m.is_organizer && <span className="ms-1.5 shrink-0 text-xs font-medium text-navy/50">{t("lobby.creatorTag")}</span>}
-                  {m.id === me?.id && <span className="ms-1.5 shrink-0 text-xs font-medium text-navy/50">{t("lobby.youTag")}</span>}
+                  {m.is_organizer && <span className="ms-1.5 shrink-0 text-xs font-medium text-navy/65">{t("lobby.creatorTag")}</span>}
+                  {m.id === me?.id && <span className="ms-1.5 shrink-0 text-xs font-medium text-navy/65">{t("lobby.youTag")}</span>}
                 </span>
                 {m.prefs_ready ? (
                   <span className="flex items-center gap-1 text-xs font-bold text-emerald-700">
@@ -129,7 +129,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
                     {t("lobby.ready")}
                   </span>
                 ) : (
-                  <span className="text-xs text-navy/45">{t("lobby.answering")}</span>
+                  <span className="text-xs text-navy/65">{t("lobby.answering")}</span>
                 )}
               </li>
             ))}
@@ -145,7 +145,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
 
       {me?.is_organizer ? (
         <section className="mx-auto w-full max-w-3xl text-center">
-          <p className={`mx-auto max-w-lg text-sm font-semibold ${canPlan ? "text-navy" : "text-navy/55"}`}>
+          <p className={`mx-auto max-w-lg text-sm font-semibold ${canPlan ? "text-navy" : "text-navy/70"}`}>
             {allReady
               ? t("lobby.allReady")
               : canForce
@@ -169,7 +169,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
 
 function CheckTile({ pop = false }: { pop?: boolean }) {
   return (
-    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-xs font-bold text-white ${pop ? "motion-safe:animate-pop" : ""}`}>
+    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-600 text-xs font-bold text-white ${pop ? "motion-safe:animate-pop" : ""}`}>
       ✓
     </span>
   );
