@@ -1,6 +1,7 @@
 // src/components/GroupChat.tsx: real-time group chat using Supabase Realtime
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Message, myMemberId, supabase } from "../lib/supabase";
+import { nextDraftAfterSend } from "../lib/voice-logic";
 import { VoiceButton } from "./VoiceButton";
 
 type Props = {
@@ -54,7 +55,7 @@ export function GroupChat({ groupId, memberName, onTranscriptChange, onVoiceErro
     onTranscriptChange?.(transcript);
   }, [messages, onTranscriptChange]);
 
-  async function postMessage(body: string) {
+  async function postMessage(body: string, opts?: { clearDraft?: boolean }) {
     const trimmed = body.trim();
     if (!trimmed || sending) return;
     setSending(true);
@@ -66,7 +67,7 @@ export function GroupChat({ groupId, memberName, onTranscriptChange, onVoiceErro
         text: trimmed,
       });
       if (error) throw error;
-      setText("");
+      setText((draft) => nextDraftAfterSend(draft, opts?.clearDraft !== false));
     } finally {
       setSending(false);
     }
@@ -120,7 +121,7 @@ export function GroupChat({ groupId, memberName, onTranscriptChange, onVoiceErro
           extraKeyterms={[memberName]}
           idleLabel="🎙"
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          onTranscript={(spoken) => postMessage(spoken)}
+          onTranscript={(spoken) => postMessage(spoken, { clearDraft: false })}
           onError={onVoiceError}
           onInfo={onVoiceInfo}
         />

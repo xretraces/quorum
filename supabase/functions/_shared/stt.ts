@@ -51,15 +51,15 @@ export function buildKeyterms(extra: string[] = []): string[] {
 /** Map a MediaRecorder mime type to a filename so xAI can auto-detect the container. */
 export function mimeToFilename(mime: string): string {
   const base = mime.split(";")[0].trim().toLowerCase();
-  if (base.includes("webm")) return "voice.webm";
   if (base.includes("mp4")) return "voice.mp4";
   if (base.includes("m4a") || base.includes("x-m4a")) return "voice.m4a";
   if (base.includes("aac")) return "voice.aac";
   if (base.includes("ogg")) return "voice.ogg";
+  if (base.includes("webm")) return "voice.webm";
   if (base.includes("mpeg") || base.includes("mp3")) return "voice.mp3";
   if (base.includes("wav") || base.includes("wave")) return "voice.wav";
   if (base.includes("flac")) return "voice.flac";
-  return "voice.webm";
+  return "voice.mp4";
 }
 
 /** Decode a raw or data-URL base64 string. Throws if empty or over MAX_AUDIO_BYTES. */

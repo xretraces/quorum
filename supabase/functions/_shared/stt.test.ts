@@ -3,11 +3,12 @@ import { assertEquals, assertThrows } from "jsr:@std/assert@1";
 import { buildKeyterms, decodeAudioBase64, mimeToFilename, PLANNING_KEYTERMS } from "./stt.ts";
 
 Deno.test("mimeToFilename maps MediaRecorder types to xAI containers", () => {
-  assertEquals(mimeToFilename("audio/webm;codecs=opus"), "voice.webm");
   assertEquals(mimeToFilename("audio/mp4"), "voice.mp4");
   assertEquals(mimeToFilename("audio/ogg;codecs=opus"), "voice.ogg");
+  assertEquals(mimeToFilename("audio/webm;codecs=opus"), "voice.webm");
+  assertEquals(mimeToFilename("audio/webm"), "voice.webm");
   assertEquals(mimeToFilename("audio/wav"), "voice.wav");
-  assertEquals(mimeToFilename("mystery/x"), "voice.webm");
+  assertEquals(mimeToFilename("mystery/x"), "voice.mp4");
 });
 
 Deno.test("buildKeyterms de-dupes, trims, and stays within xAI limits", () => {
