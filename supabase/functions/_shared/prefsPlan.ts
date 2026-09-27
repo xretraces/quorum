@@ -1,8 +1,9 @@
 // Plans from the members' private questionnaire answers (make-plan). Pure code, no Deno APIs.
 // Grok gets the answers anonymized ("Person 1"...), and the server re-checks every plan against the group's
-// hard rules: budget is a per-person cap, and vegetarian/vegan answers require veg-friendly food.
-// Dietary details, availability, and other notes are passed through for Grok to honor. Anything that fails
-// a hard rule is dropped. The same rules drive the no-Grok backup plans.
+// hard rules: budget is a per-person cap, vegetarian/vegan answers require veg-friendly food, hard no's pulled
+// from "other" ("no bars", "I don't drink", "nothing outdoors") are exclusions, "I take MARTA" / "no car" means
+// transit only, and "free after 5pm" style availability becomes a shared time window. Anything that fails a
+// hard rule is dropped. The same rules drive the no-Grok backup plans.
 // Nothing stored on a plan names a member or reveals one person's budget or constraints.
 import type { CatalogItem } from "./logic.ts";
 import { normalizePrefs, type Preferences } from "./preferences.ts";
@@ -14,10 +15,10 @@ export type GroupNeeds = {
   partySize: number;
   capCents: number | null; // lowest budget
   vegetarian: boolean;
-  transitOnly: boolean; // someone takes MARTA or walks
-  windowFrom: number | null; // minutes after midnight, latest "free from"
+  transitOnly: boolean; // someone takes MARTA, the bus, or has no car (from "other")
+  windowFrom: number | null; // minutes after midnight, latest "free after" parsed from availability
   windowUntil: number | null; // earliest "free until"
-  hardNoTerms: string[];
+  hardNoTerms: string[]; // from everyone's "other", expanded with synonyms (drink -> bar, brewery, ...)
   anyTimes: boolean;
 };
 
@@ -49,18 +50,33 @@ export function readPrefs(raw: unknown): Preferences {
 
 // ------------------------------------------------------------------ hard no's
 const NO_PREFIX = /^(?:i\s+)?(?:no|not|nothing|never|don'?t|won'?t|can'?t|avoid|hate|skip|without|anything)\b\s*(?:with|involving|like|that'?s|at|a|an|any|do|go|eat|want)?\s*/i;
+const DRINK = ["bar", "brewery", "beer", "cocktail", "wine", "alcohol"];
+const OUTDOOR = ["outdoor", "hike", "park", "picnic", "trail", "garden"];
 const ALIASES: Record<string, string[]> = {
+  drink: DRINK,
+  drinks: DRINK,
+  drinking: DRINK,
+  alcohol: DRINK,
+  booze: DRINK,
+  bar: DRINK,
+  bars: DRINK,
+  beer: ["beer", "brewery"],
+  brewery: ["beer", "brewery"],
+  breweries: ["beer", "brewery"],
   heights: ["rooftop", "summit"],
   height: ["rooftop", "summit"],
-  outside: ["outdoors", "trail", "hike", "park"],
-  outdoor: ["outdoors", "trail", "hike", "park"],
-  outdoors: ["outdoors", "trail", "hike", "park"],
-  hiking: ["hike", "summit"],
+  outside: OUTDOOR,
+  outdoor: OUTDOOR,
+  outdoors: OUTDOOR,
+  nature: OUTDOOR,
+  hike: ["hike", "summit", "trail"],
+  hikes: ["hike", "summit", "trail"],
+  hiking: ["hike", "summit", "trail"],
   walking: ["walk", "trail", "hike"],
   museums: ["museum"],
-  meat: ["bbq", "bar-b-q"],
-  barbecue: ["bbq", "bar-b-q"],
-  bbq: ["bbq", "bar-b-q"],
+  meat: ["bbq"],
+  barbecue: ["bbq"],
+  bbq: ["bbq"],
   fish: ["aquarium"],
   golf: ["golf"],
   comedy: ["improv"],
@@ -68,37 +84,133 @@ const ALIASES: Record<string, string[]> = {
   movie: ["theatre", "cinema"],
 };
 
-/** "no museums, nothing with heights" -> ["museums", "heights"]. */
-export function hardNoTermsOf(text: string): string[] {
-  return text
-    .split(/[,;\n/]|\band\b|\bor\b|\./i)
-    .map((s) => s.trim().replace(NO_PREFIX, "").replace(NO_PREFIX, "").replace(/[^a-z0-9' -]/gi, "").trim().toLowerCase())
-    .filter((s) => s.length >= 3);
+/** Negation that starts a hard no inside free text ("no bars", "I don't drink", "allergic to cats"). */
+const NEG = /\b(?:no|not|nothing|never|don'?t|dont|doesn'?t|won'?t|can'?t|cannot|avoid|hate|hates|skip|without|allergic to)\b\s*(.*)$/i;
+const FILLER = /^(?:no|not|nothing|never|don'?t|dont|won'?t|i|really|like|likes|want|wanna|to|go|going|do|doing|eat|eating|into|a|an|any|the|with|involving|that'?s|big|fan|of|more|too|much|super|very|at|in|on|anything|something|stuff)\b\s*/i;
+/** Negated words that are not activities (placeholders, "no car", "not sure"). */
+const NOT_TERMS = new Set([
+  "car", "cars", "drive", "driving", "preference", "preferences", "restriction", "restrictions", "problem", "problems",
+  "worries", "idea", "sure", "picky", "way", "limit", "limits", "rush", "one",
+]);
+/** Getting-around words: set transitOnly, never a hard no. */
+export const TRANSIT = /\b(?:marta|transit|bus|train|no car|without a car|(?:don'?t|dont|doesn'?t|can'?t) (?:have a car|drive)|on foot)\b/i;
+
+const unCurl = (s: string) => s.replace(/[\u2018\u2019\u02bc]/g, "'");
+
+function cleanPiece(raw: string): string {
+  let t = raw.toLowerCase().replace(/[^a-z0-9' -]/g, " ").replace(/\s+/g, " ").trim();
+  for (let prev = ""; prev !== t;) {
+    prev = t;
+    t = t.replace(FILLER, "").trim();
+  }
+  return t.split(" ").slice(0, 3).join(" ");
+}
+
+/**
+ * Hard-no phrases in free text. "no bars, I don't drink, nothing outdoors" -> ["bars", "drink", "outdoors"].
+ * With `all` (the legacy hardNos field) every piece counts, negated or not: "heights, museums".
+ */
+export function hardNoPhrases(text: string, all = false): string[] {
+  const out: string[] = [];
+  for (const clause of unCurl(text).split(/[,;.!?\n]|\bbut\b/i)) {
+    let rest = clause;
+    if (all) rest = clause.trim().replace(NO_PREFIX, "");
+    else {
+      const m = clause.match(NEG);
+      if (!m) continue;
+      rest = m[1];
+    }
+    for (const piece of rest.split(/\b(?:or|and|nor)\b|\//i)) {
+      const t = cleanPiece(piece);
+      if (t.length >= 3 && !NOT_TERMS.has(t) && !TRANSIT.test(t)) out.push(t);
+    }
+  }
+  return out;
+}
+
+/** Hard-no phrases plus synonyms: "I don't drink" -> ["drink", "bar", "brewery", "beer", "cocktail", "wine", ...]. */
+export function hardNoTermsOf(text: string, all = false): string[] {
+  const out = new Set<string>();
+  for (const p of hardNoPhrases(text, all)) {
+    out.add(p);
+    for (const w of p.split(" ")) for (const a of ALIASES[w] ?? []) out.add(a);
+  }
+  return [...out];
 }
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const stem = (w: string) => w.replace(/(?:ing|es|s)$/, "");
 
-/** True if a catalog item hits any hard-no term (name, category, tags, neighborhood). */
+/** True if a catalog item hits any hard-no term (name, category, tags, id). */
 export function hitsHardNo(item: CatalogEntry, terms: string[]): boolean {
-  const hay = `${item.name} ${item.category} ${(item.tags ?? []).join(" ")} ${item.neighborhood} ${item.id}`.toLowerCase();
+  // Neighborhoods are left out so "no parks" doesn't knock out everything in Inman Park; "Bar-B-Q" isn't a bar.
+  const hay = `${item.name} ${item.category} ${(item.tags ?? []).join(" ")} ${item.id}`.toLowerCase().replace(/\bbar-b-q\b/g, "bbq");
   return terms.some((t) => {
     const probes = [...(ALIASES[t] ?? []), t, ...(t.includes(" ") ? [] : [stem(t)])].filter((p) => p.length >= 3);
     return probes.some((p) => new RegExp(`\\b${esc(p)}`).test(hay));
   });
 }
 
+// ------------------------------------------------------------------ availability -> time window
+const CLOCK = String.raw`(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)?(?!\s*(?:hours?|hrs?|min|minutes|people|ppl|bucks|dollars|\$|%|\d))`;
+
+function clock(h: string, m: string | undefined, ap: string | undefined, side: "from" | "until"): number | null {
+  let hour = Number(h);
+  const min = Number(m ?? 0);
+  if (hour > 24 || min > 59) return null;
+  if (ap) {
+    if (hour > 12 || hour === 0) return null;
+    hour = (hour % 12) + (/p/i.test(ap) ? 12 : 0);
+  } else if (!m || hour < 13) {
+    // No am/pm on an evening outing: "after 5" is 5 PM, "until 11" is 11 PM, "until 12" is midnight.
+    if (side === "from" && hour >= 1 && hour <= 9) hour += 12;
+    if (side === "until" && hour >= 1 && hour <= 12) hour += 12;
+  }
+  return hour * 60 + min;
+}
+
+/**
+ * Simple window from availability text: "free after 5pm" -> from 17:00, "until 11" -> until 23:00,
+ * "6-10pm" / "18:00–23:00" -> both, "busy until 3" -> from 15:00. Anything unclear -> nulls (no rule).
+ */
+export function parseWindow(text: string): { from: number | null; until: number | null } {
+  const s = text.toLowerCase().replace(/[\u2013\u2014]/g, "-").replace(/\bmidnight\b/g, "24:00").replace(/\bnoon\b/g, "12:00");
+  let from: number | null = null;
+  let until: number | null = null;
+  const range = s.match(new RegExp(String.raw`\b${CLOCK}\s*(?:-|to)\s*${CLOCK}`));
+  if (range) {
+    from = clock(range[1], range[2], range[3] ?? (range[2] ? undefined : range[6]), "from");
+    until = clock(range[4], range[5], range[6], "until");
+  } else {
+    const busy = s.match(new RegExp(String.raw`\b(?:busy|work|working|class|classes)\b[^,.;]*?\b(?:until|till|til)\s*${CLOCK}`));
+    const after = busy ?? s.match(new RegExp(String.raw`\b(?:after|from|starting(?: at)?|free at)\s*${CLOCK}`));
+    if (after) from = clock(after[1], after[2], after[3], "from");
+    const rest = busy ? s.replace(busy[0], "") : s;
+    const before = rest.match(new RegExp(String.raw`\b(?:until|till|til|before)\s*${CLOCK}`));
+    if (before) until = clock(before[1], before[2], before[3], "until");
+  }
+  if (from !== null && until !== null && until <= from) return { from: null, until: null };
+  return { from, until };
+}
+
 // ------------------------------------------------------------------ needs + checks
 export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
   const budgets = all.flatMap((p) => (p.budget === null ? [] : [Math.round(p.budget * 100)]));
+  const windows = all.map((p) => parseWindow(p.availability));
+  const froms = windows.flatMap((w) => w.from ?? []);
+  const untils = windows.flatMap((w) => w.until ?? []);
+  let windowFrom: number | null = froms.length ? Math.max(...froms) : null;
+  let windowUntil: number | null = untils.length ? Math.min(...untils) : null;
+  // No shared window: don't enforce times (Grok is told to find the best compromise).
+  if (windowFrom !== null && windowUntil !== null && windowUntil - windowFrom < 60) windowFrom = windowUntil = null;
   return {
     partySize: Math.max(1, partySize),
     capCents: budgets.length ? Math.min(...budgets) : null,
     vegetarian: all.some((p) => VEG.test(p.dietary)),
-    transitOnly: false,
-    windowFrom: null,
-    windowUntil: null,
-    hardNoTerms: [],
+    transitOnly: all.some((p) => TRANSIT.test(unCurl(p.other))),
+    windowFrom,
+    windowUntil,
+    hardNoTerms: [...new Set(all.flatMap((p) => hardNoTermsOf(p.other)))],
     anyTimes: all.some((p) => p.availability.trim().length > 0),
   };
 }
@@ -140,9 +252,13 @@ export function violations(items: { c: CatalogEntry; start: number | null }[], n
 }
 
 // ------------------------------------------------------------------ privacy of plan text
-/** True if text could name a member or reveal someone's money ("$25", "25 bucks", "Person 2"). */
+/** Singling out one member: "someone is vegan", "one of you can't drink", "a friend who hates heights". */
+const SINGLES_OUT = /\b(?:someone|somebody|one of (?:you|us|the group|your group|them)|one (?:person|member|friend)|(?:a|your) (?:member|friend|buddy) who|anyone who|whoever|except (?:for )?one)\b/i;
+
+/** True if text could name a member, single one out, or reveal someone's money ("$25", "25 bucks", "Person 2"). */
 export function leaksPrivate(text: string, names: string[]): boolean {
   if (/\$|\b\d+\s*(?:dollars?|bucks|usd)\b|\bperson\s*\d/i.test(text)) return true;
+  if (SINGLES_OUT.test(text)) return true;
   return names.some((n) => n.trim().length >= 2 && new RegExp(`\\b${esc(n.trim())}\\b`, "i").test(text));
 }
 
@@ -211,13 +327,13 @@ Propose 2 or 3 meaningfully different plans for ${DAY}.
 HARD RULES (a plan that breaks one is thrown away):
 - Use ONLY catalog items, by exact "id". 1 to 4 items per plan.
 - The sum of price_per_person_cents of a plan's items must be <= group_rules.max_per_person_cents (when not null). Free items count.
-- Never include anything matching anyone's hard no's (group_rules.hard_no_terms, usually written in "other"). Read them generously: "no heights" excludes rooftops and summits.
+- Never include anything matching anyone's hard no's: group_rules.hard_no_terms, plus any "no X", "I don't X", "nothing X", "hate X" or "allergic to X" in a person's "other" text. Read them generously: "no heights" excludes rooftops and summits, "I don't drink" excludes bars, breweries and wine or cocktail spots, "nothing outdoors" excludes parks, hikes and picnics.
 - If group_rules.vegetarian_food_only, every food item must have veg_friendly = true.
 - If group_rules.transit_only, every item must have transit_friendly = true.
 - If group_rules.time_window is set, every item must start at or after "from" and end (start + duration_minutes) by "until". Respect typical_hours.
-SOFT: honor each person's dietary text and availability in their own words, plus "other" notes, and variety (e.g. a free/cheap plan, a food-focused one, something special). Availability is not a hard clock window. A null budget, dietary, availability, or other means that person has no preference for it. Do not invent a limit or restriction for a null field.
+SOFT: honor each person's dietary text and availability in their own words, plus "other" notes, and variety (e.g. a free/cheap plan, a food-focused one, something special). Only group_rules.time_window is a hard clock window; the rest of the availability text is soft. A null budget, dietary, availability, or other means that person has no preference for it. Do not invent a limit or restriction for a null field.
 start_time format: "${DAY} 2:00 PM". Leave a little travel time between stops.
-PRIVACY (everyone in the group reads these plans): never mention any person, "Person N", a name, a dollar amount, or one person's constraint. why_it_fits is ONE short line about the group as a whole, e.g. "Under everyone's budget, vegetarian and gluten-free options, reachable by MARTA". Item notes describe the place, not people.
+PRIVACY (everyone in the group reads these plans): never mention any person, "Person N", a name, a dollar amount, or one person's constraint. Never write "someone", "one of you" or similar. why_it_fits is ONE short line about the group as a whole, e.g. "Under everyone's budget, vegetarian and gluten-free options, reachable by MARTA". Item notes describe the place, not people.
 Output only the JSON object required by the schema.`;
 
 /** Blank text is no preference, so Grok receives null instead of an empty string. */
@@ -339,6 +455,13 @@ const sameArea = (a: CatalogEntry, b: CatalogEntry) => areaWords(a).some((w) => 
  * first), else single stops. Picks up to 3 with no shared stops, always including the cheapest.
  */
 export function backupPlans(catalog: CatalogEntry[], needs: GroupNeeds): PlanRow[] {
+  const plans = backupPlansStrict(catalog, needs);
+  if (plans.length || (needs.windowFrom === null && needs.windowUntil === null)) return plans;
+  // Nothing fits the clock window (e.g. "after 11pm"): drop only the window. Budget, food, transit and hard no's stay.
+  return backupPlansStrict(catalog, { ...needs, windowFrom: null, windowUntil: null });
+}
+
+function backupPlansStrict(catalog: CatalogEntry[], needs: GroupNeeds): PlanRow[] {
   const food = catalog.filter((c) => c.category === "food");
   const fun = catalog.filter((c) => c.category !== "food");
   type Cand = { cs: CatalogEntry[]; starts: number[]; price: number; near: boolean };

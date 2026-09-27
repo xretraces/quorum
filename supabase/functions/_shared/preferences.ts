@@ -55,7 +55,7 @@ function cleanText(v: unknown): string | undefined {
   return s === "" ? undefined : s;
 }
 
-/** Older saves used food + freeFrom/freeUntil. Fold those into the four current fields. */
+/** Older saves used food + freeFrom/freeUntil. Fold those into the four current fields (hardNos/transport below). */
 function legacyAvailability(r: Record<string, unknown>): string | undefined {
   const from = normalizeTime(r.freeFrom);
   const until = normalizeTime(r.freeUntil);
@@ -63,6 +63,30 @@ function legacyAvailability(r: Record<string, unknown>): string | undefined {
   if (from) return `from ${from}`;
   if (until) return `until ${until}`;
   return undefined;
+}
+
+const LEGACY_TRANSPORT: Record<string, string> = {
+  marta: "I take MARTA, no car",
+  walk: "walking, no car",
+  car: "I can drive",
+  rideshare: "getting there by rideshare",
+};
+
+/**
+ * Older saves also had hardNos and transport. Fold them into "other" in words the plan rules read:
+ * hardNos "heights, museums" -> "no heights, no museums"; transport "marta" -> "I take MARTA, no car".
+ */
+function legacyOther(r: Record<string, unknown>): string | undefined {
+  const parts: string[] = [];
+  const hardNos = cleanText(r.hardNos);
+  if (hardNos) {
+    parts.push(hardNos.split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean)
+      .map((x) => (/^(?:no|not|nothing|never|don'?t|won'?t|can'?t|avoid|hate|without)\b/i.test(x) ? x : `no ${x}`))
+      .join(", "));
+  }
+  const transport = cleanText(r.transport)?.toLowerCase();
+  if (transport) parts.push(LEGACY_TRANSPORT[transport] ?? `getting there by ${transport}`);
+  return parts.length ? parts.join(". ") : undefined;
 }
 
 /**
@@ -82,7 +106,7 @@ export function normalizePrefs(raw: unknown): Partial<Preferences> {
   if (dietary) out.dietary = dietary;
   const availability = cleanText(r.availability) ?? legacyAvailability(r);
   if (availability) out.availability = availability;
-  const other = cleanText(r.other);
+  const other = [cleanText(r.other), legacyOther(r)].filter(Boolean).join(". ").slice(0, MAX_TEXT);
   if (other) out.other = other;
   return out;
 }

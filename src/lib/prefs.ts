@@ -2,6 +2,7 @@
 // proves it owns its member with a token from claim_member (kept in localStorage) and reads/writes only its
 // own answers through the save_my_prefs / get_my_prefs RPCs. Others only see members.prefs_ready.
 // See supabase/migrations/20260927000001_private_prefs.sql.
+import { normalizePrefs } from "../../supabase/functions/_shared/preferences.ts";
 import type { Preferences } from "./parsePrefs";
 import { supabase } from "./supabase";
 
@@ -42,7 +43,9 @@ export async function loadMyPrefs(memberId: string): Promise<Preferences | null>
   const token = await claimMember(memberId);
   const { data, error } = await supabase.rpc("get_my_prefs", { p_member_id: memberId, p_token: token });
   if (error) throw new Error(error.message);
-  return data ? { ...EMPTY_PREFS, ...(data as Partial<Preferences>) } : null;
+  // normalizePrefs folds an older saved shape (food, hardNos, transport, times) into the four fields, so
+  // re-saving keeps those answers instead of dropping them.
+  return data ? { ...EMPTY_PREFS, ...normalizePrefs(data) } : null;
 }
 
 export async function saveMyPrefs(memberId: string, prefs: Preferences): Promise<void> {
