@@ -1,15 +1,18 @@
 // Merge rule for "Tell Grok about yourself" (components/VoiceFill.tsx). Pure, no DOM.
 import type { Preferences } from "./prefs";
 
+/** "No preference" and friends mean "leave it blank", never text that overwrites a typed answer. */
+const NO_PREF = /^(?:no preference|none|n\/a|na|anything|whatever|any|no|nothing|not sure|idk|flexible)\.?$/i;
+
 /** What to hand applyPreferences: only fields Grok actually heard, with `other` appended to what's there. */
 export function voiceFillPatch(current: Preferences, parsed: Partial<Preferences>): Partial<Preferences> {
   const out: Partial<Preferences> = {};
   if (typeof parsed.budget === "number" && Number.isFinite(parsed.budget)) out.budget = parsed.budget;
   for (const k of ["dietary", "availability"] as const) {
     const v = parsed[k]?.trim();
-    if (v) out[k] = v;
+    if (v && !NO_PREF.test(v)) out[k] = v;
   }
-  const extra = parsed.other?.trim();
+  const extra = parsed.other?.trim().replace(NO_PREF, "");
   if (extra) {
     const had = current.other.trim();
     out.other = !had ? extra : saysNothingNew(had, extra) ? had : `${had.replace(/[.;,\s]+$/, "")}. ${extra}`.slice(0, 1500); // form maxLength

@@ -21,3 +21,8 @@ test("a reworded repeat of 'other' from a second take is not appended", () => {
   assert.deepEqual(voiceFillPatch(cur, { other: "I don't have a car" }), { other: "doesn't have a car" });
   assert.deepEqual(voiceFillPatch(cur, { other: "no bars" }), { other: "doesn't have a car. no bars" });
 });
+
+test("'no preference' style values never overwrite a typed answer", () => {
+  const cur = { budget: 30, dietary: "vegan", availability: "Sat after 6pm", other: "" };
+  assert.deepEqual(voiceFillPatch(cur, { dietary: "no preference", availability: "Anything.", other: "none" }), {});
+});
