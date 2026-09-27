@@ -1,8 +1,8 @@
 // POST /functions/v1/make-plan  { group_id: string }
 // Builds 2-3 plans from the members' PRIVATE questionnaire answers (member_prefs, read with the service role),
 // not from chat. Grok (xAI chat completions, strict JSON schema, reasoning_effort "low") sees the answers
-// anonymized; the server re-checks every plan against the hard rules (budget cap, hard no's, transport, free
-// window, opening hours) and drops failures. If Grok is unavailable or nothing it proposed survives, deterministic backup
+// anonymized; the server re-checks every plan against the hard rules (budget cap, hard no's, vegetarian and
+// gluten-free food, transport, free window, opening hours) and drops failures. If Grok is unavailable or nothing it proposed survives, deterministic backup
 // plans are built from the same answers (model "backup"). Replaces the group's plans and resets votes.
 // Grok gets at most GROK_BUDGET_MS in total (first attempt capped at GROK_FIRST_ATTEMPT_MS, the validation retry
 // only gets what is left), so a slow Grok falls back to backup plans at ~110s instead of hitting the Edge
@@ -26,6 +26,7 @@ import {
   PREFS_PLAN_SCHEMA,
   type PlanRow,
   readPrefs,
+  settleGlutenFree,
 } from "../_shared/prefsPlan.ts";
 import type { Preferences } from "../_shared/preferences.ts";
 
@@ -129,7 +130,7 @@ Deno.serve(serveJson(async (body) => {
   const needed = Math.min(2, roster.length);
   if (all.length < Math.max(1, needed)) throw new HttpError(400, "Wait until at least 2 people have answered.");
 
-  const needs = groupNeeds(all, roster.length);
+  const needs = settleGlutenFree(groupNeeds(all, roster.length), catalog);
   const names = roster.map((m) => m.display_name);
   const fromGrok = await planWithGrok(all, needs, names);
   const backup = fromGrok ? null : backupPlans(catalog, needs);

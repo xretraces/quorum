@@ -8,6 +8,9 @@ verify_jwt = false
 [functions.pay]
 verify_jwt = false
 
+[functions.transcribe]
+verify_jwt = false
+
 [functions.recap-image]
 verify_jwt = false
 
