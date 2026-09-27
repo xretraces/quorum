@@ -1,5 +1,5 @@
 // src/components/JoinGroup.tsx: a friend scans the QR / opens /join/:inviteCode and joins with a display name.
-// Their preferences are asked privately in the lobby (Questionnaire), not here.
+// A new member lands on their private answers page (/g/:id/answers); a returning one goes to the lobby.
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n/hooks";
 import { isClosed } from "../lib/invite";
@@ -9,7 +9,7 @@ import { type Group, myMemberId, setMyMemberId, supabase } from "../lib/supabase
 
 type Load = "loading" | "ok" | "not-found" | "offline";
 
-export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoined: (groupId: string) => void }) {
+export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoined: (groupId: string, fresh: boolean) => void }) {
   const t = useT();
   const [group, setGroup] = useState<Group | null>(null);
   const [load, setLoad] = useState<Load>("loading");
@@ -22,7 +22,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
     supabase.from("groups").select("*").eq("invite_code", inviteCode.trim()).maybeSingle().then(({ data, error }) => {
       if (error) return setLoad("offline");
       if (!data) return setLoad("not-found");
-      if (myMemberId(data.id)) return onJoined(data.id); // already joined on this device: resume
+      if (myMemberId(data.id)) return onJoined(data.id, false); // already joined on this device: resume in the lobby
       setGroup(data as Group);
       setLoad("ok");
     });
@@ -53,7 +53,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
       }
       setMyMemberId(group.id, data.id);
       await claimMember(data.id).catch((e) => console.warn(e)); // retried when the questionnaire opens
-      onJoined(group.id);
+      onJoined(group.id, true);
     } catch (e) {
       setErr(t("join.failedNetwork", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
@@ -92,7 +92,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
           <p className="font-logo text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
           <h1 className="text-xl font-bold">{t("join.closedTitle", { group: group.name })}</h1>
           <p className="text-sm text-gray-600">{t("join.closedBody")}</p>
-          <button onClick={() => onJoined(group.id)} className="w-full rounded-xl bg-navy p-3 font-semibold text-white hover:brightness-95">
+          <button onClick={() => onJoined(group.id, false)} className="w-full rounded-xl bg-navy p-3 font-semibold text-white hover:brightness-95">
             {t("join.seePlan")}
           </button>
           <a href="/" className="inline-flex min-h-11 items-center text-sm text-navy underline">{t("join.startOwn")}</a>

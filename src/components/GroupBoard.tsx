@@ -1,4 +1,5 @@
-// Group board: lobby (QR invite, live members + ready checks, private questionnaire) -> the creator asks Grok
+// Group board: lobby (QR invite, live members + ready checks, "Fill out my answers") with the private questionnaire on its
+// own page (/g/:id/answers; saving returns to the lobby) -> the creator asks Grok
 // (make-plan reads everyone's private answers server-side) with the shared "Grok is working" steps -> plan cards
 // with real venue photos and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
 // breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
@@ -12,7 +13,11 @@ import { FinalPlan } from "./FinalPlan";
 import { GrokWorking } from "./GrokWorking";
 import { Lobby } from "./Lobby";
 import { PlanCard } from "./PlanCard";
+import { Questionnaire } from "./Questionnaire";
 import { QuorumHeader } from "./QuorumHeader";
+
+export type Navigate = { replace?: boolean; state?: unknown };
+type Page = "lobby" | "answers";
 
 /** Live tally: the winner once every member has voted and one plan has the most votes. */
 function tally(plans: Plan[], members: Member[]) {
@@ -35,8 +40,11 @@ function labelsFor(plan: Plan, plans: Plan[]) {
   return out;
 }
 
-export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () => void }) {
+type Props = { groupId: string; page: Page; navigate: (path: string, opts?: Navigate) => void; onHome: () => void };
+
+export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
   const t = useT();
+  const [savedNote, setSavedNote] = useState(false);
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -84,6 +92,29 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
 
   const winner = plans.find((p) => p.id === group?.selected_plan_id) ?? null;
   const { voted, winner: leading, tied } = tally(plans, members);
+  const stage = grokRun ? "grok" : winner ? "final" : plans.length ? "vote" : "lobby";
+
+  const lobbyPath = `/g/${groupId}`;
+  const openAnswers = () => navigate(`${lobbyPath}/answers`, { state: { fromLobby: true } });
+  /** Back to the lobby: pop the answers entry if we came from the lobby, else replace it (deep link / fresh join). */
+  const backToLobby = useCallback(() => {
+    if ((window.history.state as { fromLobby?: boolean } | null)?.fromLobby) window.history.back();
+    else navigate(lobbyPath, { replace: true });
+  }, [navigate, lobbyPath]);
+
+  // The answers page is only for members while the group is still collecting answers: non-members go to the join page
+  // (or the board if the group is closed), and once Grok is working or plans exist everyone is sent to the board.
+  useEffect(() => {
+    if (page !== "answers" || !group) return;
+    if (!me) navigate(isClosed(group) ? lobbyPath : `/join/${group.invite_code}`, { replace: true });
+    else if (stage !== "lobby") navigate(lobbyPath, { replace: true });
+  }, [page, group, me, stage, navigate, lobbyPath]);
+
+  useEffect(() => {
+    if (!savedNote) return;
+    const id = window.setTimeout(() => setSavedNote(false), 3500);
+    return () => window.clearTimeout(id);
+  }, [savedNote]);
 
   // Everyone voted and one plan leads: record it (any phone may; the write is idempotent).
   useEffect(() => {
@@ -207,8 +238,53 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   }
 
   const organizer = members.find((m) => m.is_organizer);
-  const stage = grokRun ? "grok" : winner ? "final" : plans.length ? "vote" : "lobby";
   const badge = winner ? statusBadge("decided") : statusBadge(group.status);
+
+  if (page === "answers") {
+    const toLobby = (e: React.MouseEvent) => {
+      e.preventDefault();
+      backToLobby();
+    };
+    return (
+      <div className="quorum-inner relative isolate min-h-dvh">
+        <div className="relative z-10 mx-auto max-w-md space-y-4 p-4">
+          <div className="flex justify-end">
+            <QuorumHeader groupId={groupId} tone="onLight" />
+          </div>
+          <header className="flex items-center gap-3">
+            <a
+              href={lobbyPath}
+              onClick={toLobby}
+              aria-label={t("answers.back")}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-navy shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
+            >
+              <span className="inline-block rtl:-scale-x-100">←</span>
+            </a>
+            <div className="min-w-0 flex-1">
+              <a href={lobbyPath} onClick={toLobby} dir="auto" className="block truncate text-xs font-semibold text-navy">{t("answers.backTo", { group: group.name })}</a>
+              <h1 className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{t("lobby.yourAnswers")}</h1>
+            </div>
+          </header>
+          {me && stage === "lobby" ? (
+            <section className="rounded-2xl bg-white p-4 shadow-md">
+              <p className="mb-3 text-sm text-gray-600">{t(me.prefs_ready ? "answers.introEdit" : "answers.intro")}</p>
+              <Questionnaire
+                memberId={me.id}
+                onSaved={() => {
+                  setSavedNote(true);
+                  void load();
+                  backToLobby();
+                }}
+              />
+            </section>
+          ) : (
+            <p className="text-center text-gray-600">{t("common.loading")}</p>
+          )}
+          {err && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{err}</div>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="quorum-inner relative isolate min-h-dvh">
@@ -246,7 +322,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
         )}
 
         {stage === "lobby" && (
-          <Lobby group={group} members={members} me={me} busy={!!busy} onAskGrok={askGrok} onRefresh={load} />
+          <Lobby group={group} members={members} me={me} busy={!!busy} saved={savedNote} onAskGrok={askGrok} onOpenAnswers={openAnswers} />
         )}
 
         {grokRun && <GrokWorking key={grokRun.startedAt} run={grokRun} isMine={grokRun === myRun} onDone={dismissGrokRun} />}
