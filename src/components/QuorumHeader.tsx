@@ -96,6 +96,11 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
     };
   }, [bellOpen]);
 
+  // Events that arrive while the list is open are seen, so they shouldn't leave a badge behind after closing.
+  useEffect(() => {
+    if (bellOpen && unread > 0) markRead();
+  }, [bellOpen, unread, markRead]);
+
   function openBell() {
     setBellOpen((o) => !o);
     if (!bellOpen) markRead();

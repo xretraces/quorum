@@ -116,6 +116,18 @@ export function useGroupNotifications(groupId: string | null | undefined) {
   const [members, setMembers] = useState<Member[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const metaRef = useRef<Meta>({ firstSeen: {}, readKeys: [] });
+  const metaKeyRef = useRef<string | null>(null);
+  // Load the stored read/first-seen state synchronously for this group+member. Loading it in the effect (after the
+  // first render) let the first render's saveMeta() overwrite it with an empty state, so every reload showed all
+  // old events as unread again.
+  const metaFor = useCallback((gid: string, mid: string | null) => {
+    const k = storageKey(gid, mid);
+    if (metaKeyRef.current !== k) {
+      metaRef.current = loadMeta(gid, mid);
+      metaKeyRef.current = k;
+    }
+    return metaRef.current;
+  }, []);
   const [readKeys, setReadKeys] = useState<string[]>([]);
   const [tick, setTick] = useState(0);
 
@@ -127,9 +139,7 @@ export function useGroupNotifications(groupId: string | null | undefined) {
       setReadKeys([]);
       return;
     }
-    const meta = loadMeta(groupId, meId);
-    metaRef.current = meta;
-    setReadKeys(meta.readKeys);
+    setReadKeys(metaFor(groupId, meId).readKeys);
 
     // Migrate legacy read-at timestamp if present.
     const legacy = localStorage.getItem(`${READ_PREFIX}${groupId}:${meId ?? "anon"}`);
@@ -160,15 +170,15 @@ export function useGroupNotifications(groupId: string | null | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [groupId, meId]);
+  }, [groupId, meId, metaFor]);
 
   const items = useMemo(() => {
     if (!groupId) return [] as GroupNotification[];
-    const list = derive(group, members, plans, meId, metaRef.current);
+    const list = derive(group, members, plans, meId, metaFor(groupId, meId));
     saveMeta(groupId, meId, metaRef.current);
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId, group, members, plans, meId, tick]);
+  }, [groupId, group, members, plans, meId, tick, metaFor]);
 
   const readSet = useMemo(() => new Set(readKeys), [readKeys]);
   const unread = useMemo(() => items.filter((n) => !readSet.has(n.key)).length, [items, readSet]);
