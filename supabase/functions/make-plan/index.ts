@@ -1,31 +1,41 @@
-// POST /functions/v1/make-plan  { group_id: string, transcript?: string, hard_cap?: boolean }
-// Calls Grok (xAI chat completions, strict JSON schema) to extract each member's constraints and
-// propose 2-3 plans from the fixed Atlanta catalog, re-validates everything server-side, then
-// replaces the group's plans rows. Secrets: GROK_API_KEY (or XAI_API_KEY), optional GROK_MODEL.
+// POST /functions/v1/make-plan  { group_id: string }
+// Builds 2-3 plans from the members' PRIVATE questionnaire answers (member_prefs, read with the service role),
+// not from chat. Grok (xAI chat completions, strict JSON schema, reasoning_effort "low") sees the answers
+// anonymized; the server re-checks every plan against the hard rules (budget cap, hard no's, transport, free
+// window) and drops failures. If Grok is unavailable or nothing it proposed survives, deterministic backup
+// plans are built from the same answers (model "backup"). Replaces the group's plans and resets votes.
+// Nothing written or returned names a member or reveals one person's answers.
+// Secrets: GROK_API_KEY (or XAI_API_KEY), optional GROK_MODEL.
 
 import { CATALOG_FILE } from "../_shared/catalog.ts";
-import { PLAN_SCHEMA } from "../_shared/plan-schema.ts";
-import { SYSTEM_PROMPT } from "../_shared/system-prompt.ts";
-import { adminClient, type GroupRow, type MemberRow } from "../_shared/db.ts";
-import { HttpError, optString, reqString, serveJson } from "../_shared/http.ts";
+import { adminClient } from "../_shared/db.ts";
+import { HttpError, reqString, serveJson } from "../_shared/http.ts";
+import { schemaForRequest, validateSchema } from "../_shared/logic.ts";
 import {
-  type CatalogItem,
-  type ModelOutput,
-  normalizeModelOutput,
-  schemaForRequest,
-  validateSchema,
-} from "../_shared/logic.ts";
+  backupPlans,
+  type CatalogEntry,
+  type GrokPlan,
+  grokPayload,
+  groupNeeds,
+  type GroupNeeds,
+  normalizeGrokPlans,
+  PREFS_PLAN_PROMPT,
+  PREFS_PLAN_SCHEMA,
+  type PlanRow,
+  readPrefs,
+} from "../_shared/prefsPlan.ts";
+import type { Preferences } from "../_shared/preferences.ts";
 
 const XAI_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_MODEL = "grok-4.7"; // override with the GROK_MODEL secret
-const catalog = CATALOG_FILE.activities as unknown as CatalogItem[];
-const requestSchema = schemaForRequest(PLAN_SCHEMA, catalog.map((c) => c.id));
+const catalog = CATALOG_FILE.activities as unknown as CatalogEntry[];
+const requestSchema = schemaForRequest(PREFS_PLAN_SCHEMA as unknown as Record<string, unknown>, catalog.map((c) => c.id));
 
-async function callGrok(userPayload: unknown, model: string, apiKey: string): Promise<{ output: ModelOutput; raw: string }> {
+async function callGrok(userPayload: unknown, model: string, apiKey: string): Promise<GrokPlan[]> {
   let lastErrors: string[] = [];
   for (let attempt = 1; attempt <= 2; attempt++) {
     const messages: { role: string; content: string }[] = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: PREFS_PLAN_PROMPT },
       { role: "user", content: JSON.stringify(userPayload) },
     ];
     if (attempt > 1) {
@@ -40,20 +50,18 @@ async function callGrok(userPayload: unknown, model: string, apiKey: string): Pr
       body: JSON.stringify({
         model,
         messages,
+        reasoning_effort: "low",
         response_format: {
           type: "json_schema",
-          json_schema: { name: "plan_and_pay", schema: requestSchema, strict: true },
+          json_schema: { name: "quorum_plans", schema: requestSchema, strict: true },
         },
       }),
       signal: AbortSignal.timeout(90_000),
     });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new HttpError(502, `xAI API error ${res.status}`, text.slice(0, 2000));
-    }
+    if (!res.ok) throw new Error(`xAI API error ${res.status}: ${(await res.text()).slice(0, 500)}`);
     const data = await res.json();
     const content: unknown = data?.choices?.[0]?.message?.content;
-    if (typeof content !== "string") throw new HttpError(502, "xAI response had no message content", data);
+    if (typeof content !== "string") throw new Error("xAI response had no message content");
 
     let parsed: unknown;
     try {
@@ -63,87 +71,70 @@ async function callGrok(userPayload: unknown, model: string, apiKey: string): Pr
       continue;
     }
     lastErrors = validateSchema(requestSchema, parsed);
-    if (lastErrors.length === 0) return { output: parsed as ModelOutput, raw: content };
+    if (lastErrors.length === 0) return (parsed as { plans: GrokPlan[] }).plans;
   }
-  throw new HttpError(502, "Grok output failed validation after retry", lastErrors);
+  throw new Error(`Grok output failed validation after retry: ${lastErrors.slice(0, 5).join("; ")}`);
+}
+
+async function planWithGrok(all: Preferences[], needs: GroupNeeds, names: string[]) {
+  const apiKey = Deno.env.get("GROK_API_KEY") ?? Deno.env.get("XAI_API_KEY");
+  if (!apiKey) {
+    console.warn("make-plan: GROK_API_KEY not set, using backup plans");
+    return null;
+  }
+  const model = Deno.env.get("GROK_MODEL") || DEFAULT_MODEL;
+  try {
+    const raw = await callGrok(grokPayload(all, needs, catalog), model, apiKey);
+    const { plans, dropped } = normalizeGrokPlans(raw, catalog, needs, names);
+    if (dropped.length) console.warn("make-plan: dropped Grok plans:", dropped); // server log only
+    if (plans.length === 0) {
+      console.warn("make-plan: no Grok plan passed the hard rules, using backup plans");
+      return null;
+    }
+    return { plans, model };
+  } catch (err) {
+    console.error("make-plan: Grok failed, using backup plans:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 Deno.serve(serveJson(async (body) => {
   const groupId = reqString(body, "group_id");
-  const transcriptIn = optString(body, "transcript");
-  // Set after someone rejects a plan as too expensive: every returned plan must fit every known cap.
-  const hardCap = body.hard_cap === true;
-
-  const apiKey = Deno.env.get("GROK_API_KEY") ?? Deno.env.get("XAI_API_KEY");
-  if (!apiKey) throw new HttpError(500, "GROK_API_KEY (or XAI_API_KEY) secret is not set");
-  const model = Deno.env.get("GROK_MODEL") || DEFAULT_MODEL;
 
   const db = adminClient();
-  const { data: group, error: gErr } = await db.from("groups").select("*").eq("id", groupId).maybeSingle<GroupRow>();
+  const { data: group, error: gErr } = await db.from("groups").select("id,status").eq("id", groupId).maybeSingle();
   if (gErr) throw gErr;
   if (!group) throw new HttpError(404, "Group not found");
-  if (group.status === "captured" || group.status === "partially_captured") {
-    throw new HttpError(409, "This group has already paid; start a new group.");
-  }
+  if (group.status === "decided") throw new HttpError(409, "This group already picked a plan.");
 
-  // Don't swap plans out from under live card holds.
-  const { data: live, error: pErr } = await db.from("payments").select("id,status").eq("group_id", groupId);
-  if (pErr) throw pErr;
-  if ((live ?? []).some((p) => p.status !== "canceled")) {
-    throw new HttpError(409, "Cancel the existing holds (pay: cancel) before generating new plans.");
-  }
-
-  const { data: members, error: mErr } = await db.from("members").select("*").eq("group_id", groupId).order("created_at");
+  const { data: members, error: mErr } = await db.from("members")
+    .select("id,display_name,prefs_ready").eq("group_id", groupId).order("created_at");
   if (mErr) throw mErr;
-  const roster = (members ?? []) as MemberRow[];
+  const roster = (members ?? []) as { id: string; display_name: string; prefs_ready: boolean }[];
 
-  const transcript = transcriptIn ?? group.transcript ?? "";
-  if (!transcript && roster.length === 0) throw new HttpError(400, "Provide a transcript or add members first.");
+  const { data: rows, error: pErr } = await db.from("member_prefs").select("member_id,prefs").eq("group_id", groupId);
+  if (pErr) throw pErr;
+  const answered = new Map((rows ?? []).filter((r) => r.prefs).map((r) => [r.member_id as string, r.prefs as unknown]));
+  const all = roster.filter((m) => answered.has(m.id)).map((m) => readPrefs(answered.get(m.id)));
+  const needed = Math.min(2, roster.length);
+  if (all.length < Math.max(1, needed)) throw new HttpError(400, "Wait until at least 2 people have answered.");
 
-  const userPayload = {
-    roster: roster.map((m) => ({
-      member_id: m.id,
-      name: m.display_name,
-      confirmed_budget_cap_cents: m.cap_source === "member" ? m.budget_cap_cents : null,
-      dietary: m.dietary ?? "",
-      availability: m.availability ?? "",
-      location: m.location ?? "",
-      transport: m.transport ?? "",
-    })),
-    catalog: catalog.map(({ id, name, category, neighborhood, price_per_person_cents, veg_friendly, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note }) => ({
-      id, name, category, neighborhood, price_per_person_cents, veg_friendly, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note,
-    })),
-    transcript: transcript.slice(0, 20_000),
-    ...(hardCap
-      ? { hard_budget_rule: "A member rejected the last plans as too expensive. Every plan MUST have per_person_cents <= every known budget cap. Do not propose any flagged over-cap plan; prefer free and cheap catalog items." }
-      : {}),
-  };
+  const needs = groupNeeds(all, roster.length);
+  const names = roster.map((m) => m.display_name);
+  const fromGrok = await planWithGrok(all, needs, names);
+  const plans: PlanRow[] = fromGrok?.plans ?? backupPlans(catalog, needs);
+  const model = fromGrok?.model ?? "backup";
+  if (plans.length === 0) {
+    throw new HttpError(422, "Nothing in the catalog fits everyone's answers. Try loosening a budget or a hard no.");
+  }
 
-  const { output } = await callGrok(userPayload, model, apiKey);
-  const rosterForLogic = roster.map((m) => ({
-    id: m.id,
-    display_name: m.display_name,
-    budget_cap_cents: m.cap_source === "member" ? m.budget_cap_cents : null, // re-extract grok caps each run
-    dietary: m.dietary,
-    transport: m.transport,
-  }));
-  const normalized = normalizeModelOutput(output, catalog, rosterForLogic);
-  const { memberUpdates, warnings } = normalized;
-  const plans = hardCap
-    ? normalized.plans.filter((p) => p.over_cap_member_ids.length === 0).map((p, i) => ({ ...p, option_index: i }))
-    : normalized.plans;
-  if (hardCap && plans.length < normalized.plans.length) warnings.push("Dropped plans that exceed a member's cap (hard_cap).");
-  if (plans.length === 0) throw new HttpError(502, "Grok returned no usable plans", warnings);
-
-  // Replace plans. (Not transactional; fine for a demo. Wrap it in an RPC for real use.)
-  const del1 = await db.from("payments").delete().eq("group_id", groupId).eq("status", "canceled");
-  if (del1.error) throw del1.error;
-  const reset = await db.from("members")
-    .update({ vote_plan_id: null, approved: false, approved_amount_cents: null, approved_at: null })
-    .eq("group_id", groupId);
+  // Replace plans. (Not transactional; fine for a demo.)
+  const reset = await db.from("members").update({ vote_plan_id: null }).eq("group_id", groupId);
   if (reset.error) throw reset.error;
-  const del2 = await db.from("plans").delete().eq("group_id", groupId);
-  if (del2.error) throw del2.error;
+  const g0 = await db.from("groups").update({ selected_plan_id: null, recap_image_url: null }).eq("id", groupId);
+  if (g0.error) throw g0.error;
+  const del = await db.from("plans").delete().eq("group_id", groupId);
+  if (del.error) throw del.error;
 
   const { data: inserted, error: iErr } = await db.from("plans").insert(
     plans.map((p) => ({
@@ -155,37 +146,19 @@ Deno.serve(serveJson(async (body) => {
       per_person_cents: p.per_person_cents,
       total_cents: p.total_cents,
       fits_everyone: p.fits_everyone,
-      over_cap_member_ids: p.over_cap_member_ids,
-      member_notes: p.member_notes,
+      over_cap_member_ids: [],
+      member_notes: [],
       why_it_works: p.why_it_works,
-      reasoning: output.reasoning,
-      server_warnings: p.server_warnings,
+      reasoning: null,
+      server_warnings: [],
       model,
-      raw: output,
+      raw: null,
     })),
   ).select("*");
   if (iErr) throw iErr;
 
-  for (const u of memberUpdates) {
-    const patch: Record<string, unknown> = {
-      constraints: u.constraints,
-      dietary: u.dietary,
-      availability: u.availability,
-      location: u.location,
-      transport: u.transport,
-    };
-    if (u.budget_cap_cents !== undefined) {
-      patch.budget_cap_cents = u.budget_cap_cents;
-      patch.cap_source = "grok";
-    }
-    const r = await db.from("members").update(patch).eq("id", u.id);
-    if (r.error) throw r.error;
-  }
-
-  const g = await db.from("groups")
-    .update({ status: "voting", transcript: transcript || null, selected_plan_id: null })
-    .eq("id", groupId);
+  const g = await db.from("groups").update({ status: "voting" }).eq("id", groupId);
   if (g.error) throw g.error;
 
-  return { plans: inserted, extracted_members: output.members, constraints: output.constraints, reasoning: output.reasoning, warnings, model };
+  return { plans: inserted, model, source: fromGrok ? "grok" : "backup", answered: all.length };
 }));
