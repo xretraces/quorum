@@ -46,19 +46,19 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
 
   if (!group) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-indigo-50 to-white p-4">
-        <p className="text-gray-600">{err ?? "Loading…"}</p>
+      <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
+        <p className="relative z-10 text-gray-600">{err ?? "Loading…"}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-indigo-50 to-white p-4">
-      <form onSubmit={join} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-lg">
-        <p className="text-center text-2xl font-bold text-indigo-600">Quorum</p>
-        <h1 className="text-xl font-bold">Join "{group.name}"</h1>
+    <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
+      <form onSubmit={join} className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-spring/20">
+        <p className="font-logo text-center text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
+        <h1 className="text-xl font-bold text-gray-900">Join "{group.name}"</h1>
         <input
-          className="w-full rounded-lg border border-gray-300 p-3 text-base focus:border-transparent focus:ring-2 focus:ring-indigo-500"
+          className="w-full rounded-lg border border-gray-300 p-3 text-base focus:border-spring focus:outline-none focus:ring-2 focus:ring-spring/40"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name"
@@ -66,7 +66,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
           autoFocus
           required
         />
-        <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
+        <button disabled={busy} className="w-full rounded-xl bg-spring-deep p-3 font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-50">
           {busy ? "Joining…" : "Join"}
         </button>
         <p className="text-center text-xs text-gray-500">Next you'll answer a few private questions. Only Grok sees them.</p>

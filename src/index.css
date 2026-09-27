@@ -1,6 +1,13 @@
 @import "tailwindcss";
 
 @theme {
+  --color-spring: #9ad6f4;
+  --color-spring-deep: #3aa6d2;
+  --color-navy: #164e72;
+  --color-sun: #ffd000;
+  --font-logo: "Sora", ui-sans-serif, system-ui, sans-serif;
+  --font-ui: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+
   --animate-pop: pop 0.3s ease-out;
 
   @keyframes pop {
@@ -8,6 +15,50 @@
     70% { transform: scale(1.12); }
     100% { transform: scale(1); opacity: 1; }
   }
+}
+
+html,
+body,
+#root {
+  background-color: #fff;
+}
+
+/* Home screen only: spring-blue page (avoids purple overscroll). */
+.quorum-create {
+  font-family: var(--font-ui);
+  background:
+    radial-gradient(circle 28rem at 50% -10%, color-mix(in srgb, var(--color-spring-deep) 70%, white), transparent 70%),
+    linear-gradient(180deg, var(--color-spring-deep) 0%, var(--color-spring) 48%, #b6e3f8 100%);
+}
+
+html:has(.quorum-create),
+html:has(.quorum-create) body,
+html:has(.quorum-create) #root {
+  background-color: var(--color-spring-deep);
+}
+
+/* Join + group board: white page, spring-blue bubbles, no purple chrome. */
+.quorum-inner {
+  font-family: var(--font-ui);
+  background-color: #fff;
+}
+
+html:has(.quorum-inner),
+html:has(.quorum-inner) body,
+html:has(.quorum-inner) #root {
+  background-color: #fff;
+}
+
+.quorum-inner::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(circle 10rem at 8% 0%, color-mix(in srgb, var(--color-spring) 42%, transparent), transparent 68%),
+    radial-gradient(circle 7rem at 96% 18%, color-mix(in srgb, var(--color-spring) 34%, transparent), transparent 70%),
+    radial-gradient(circle 9rem at 78% 100%, color-mix(in srgb, var(--color-spring) 24%, transparent), transparent 72%);
 }
 
 /* "Grok is reading the chat…" shimmer (design-refs/chat/20). */

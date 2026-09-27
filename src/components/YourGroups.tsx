@@ -78,12 +78,12 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
   if (ids.length === 0) return null;
 
   return (
-    <section className="rounded-2xl bg-white p-4 shadow-lg">
-      <h2 className="mb-2 px-2 text-xl font-bold">Your Groups</h2>
+    <section>
+      <h2 className="mb-3 text-center text-sm font-semibold text-navy/80">Your groups</h2>
       {groups === null ? (
-        <p className="px-2 py-3 text-sm text-gray-500">Loading…</p>
+        <p className="py-3 text-center text-sm text-navy/70">Loading…</p>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="space-y-2">
           {groups.map((g) => {
             const s = statusBadge(g.status);
             const count = g.members[0]?.count ?? 0;
@@ -91,16 +91,16 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
               <li key={g.id}>
                 <button
                   onClick={() => onOpen(g.id)}
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-indigo-50 active:bg-indigo-100"
+                  className="flex min-h-12 w-full items-center gap-3 rounded-lg border-2 border-navy/25 bg-white/55 px-4 py-3 text-left text-navy transition-colors hover:bg-white/80"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold text-gray-900">{g.name}</span>
-                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}>{s.label}</span>
+                      <span className="truncate font-semibold">{g.name}</span>
+                      <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${s.cls}`}>{s.label}</span>
                     </div>
-                    <p className="mt-0.5 truncate text-sm text-gray-500">{count} {count === 1 ? "person" : "people"}</p>
+                    <p className="mt-0.5 truncate text-sm text-navy/70">{count} {count === 1 ? "person" : "people"}</p>
                   </div>
-                  <div className="shrink-0 text-right text-xs text-gray-500">
+                  <div className="shrink-0 text-right text-xs text-navy/60">
                     <div>{ago(activityOf(g))}</div>
                   </div>
                 </button>
