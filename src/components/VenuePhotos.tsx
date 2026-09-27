@@ -3,6 +3,7 @@
 // data/atlanta-activities.json `photo` / `photoCredit`). A stop without a photo gets a gradient + category icon.
 // Grok Imagine is only used for the winning plan's poster (Recap on the final screen).
 import { useState } from "react";
+import { useT } from "../i18n/hooks";
 import { venuePhoto } from "../lib/booking";
 import type { PlanItem } from "../lib/supabase";
 
@@ -24,6 +25,7 @@ function Photo({ item, i, className }: { item: PlanItem; i: number; className: s
 }
 
 export function VenuePhotos({ items }: { items: PlanItem[] }) {
+  const t = useT();
   if (items.length === 0) return null;
   const [first, ...rest] = items;
   const credits = items.map((it) => venuePhoto(it.catalog_id)?.photoCredit).filter((c, k, all) => c && all.findIndex((d) => d?.source === c.source) === k);
@@ -47,14 +49,14 @@ export function VenuePhotos({ items }: { items: PlanItem[] }) {
       </div>
       {credits.length > 0 && (
         <p className="mt-1 px-1 text-[10px] leading-snug text-gray-400">
-          {credits.length === 1 ? "Photo" : "Photos"}:{" "}
+          {credits.length === 1 ? t("photos.photo") : t("photos.photos")}:{" "}
           {credits.map((c, k) => (
             <span key={c!.source}>
               {k > 0 && ", "}
               <a href={c!.source} target="_blank" rel="noopener noreferrer" className="hover:underline">{c!.author} / {c!.license}</a>
             </span>
           ))}{" "}
-          via {[...new Set(credits.map((c) => (c!.source.includes("flickr.com") ? "Flickr" : "Wikimedia Commons")))].join(" & ")}
+          {t("photos.via")} {[...new Set(credits.map((c) => (c!.source.includes("flickr.com") ? "Flickr" : "Wikimedia Commons")))].join(" & ")}
         </p>
       )}
     </div>

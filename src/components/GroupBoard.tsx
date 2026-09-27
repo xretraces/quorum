@@ -3,6 +3,7 @@
 // with real venue photos and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
 // breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useT } from "../i18n/hooks";
 import { buildFallbackPlans } from "../lib/fallback";
 import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
 import { isClosed } from "../lib/invite";
@@ -24,15 +25,17 @@ function tally(plans: Plan[], members: Member[]) {
   return { voted, allVoted, winner: allVoted && leaders.length === 1 ? leaders[0] : null, tied: allVoted && leaders.length > 1 ? leaders : [] };
 }
 
+/** i18n keys of the plan's badges. */
 function labelsFor(plan: Plan, plans: Plan[]) {
   const min = Math.min(...plans.map((p) => p.per_person_cents));
   const out: string[] = [];
-  if (plan.fits_everyone) out.push("Fits everyone");
-  if (plans.length > 1 && plan.per_person_cents === min && plans.some((p) => p.per_person_cents !== min)) out.push("Cheapest");
+  if (plan.fits_everyone) out.push("plan.fitsEveryone");
+  if (plans.length > 1 && plan.per_person_cents === min && plans.some((p) => p.per_person_cents !== min)) out.push("plan.cheapest");
   return out;
 }
 
 export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () => void }) {
+  const t = useT();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -57,11 +60,11 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       supabase.from("plans").select("*").eq("group_id", groupId).order("option_index"),
     ]);
     if (g.error) setErr(g.error.message);
-    else if (!g.data) setErr("Group not found. Please check the group code.");
+    else if (!g.data) setErr(t("board.groupNotFound"));
     else setGroup(g.data as Group);
     setMembers((m.data ?? []) as Member[]);
     setPlans((p.data ?? []) as Plan[]);
-  }, [groupId]);
+  }, [groupId, t]);
 
   useEffect(() => {
     load();
@@ -143,7 +146,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     setBusy("grok");
     setErr(null);
     setInfo(null);
-    const started: GrokRun = { startedAt: Date.now(), finishedAt: null, outcome: "working", by: me?.display_name ?? "The creator" };
+    const started: GrokRun = { startedAt: Date.now(), finishedAt: null, outcome: "working", by: me?.display_name ?? t("common.theCreatorStart") };
     const finishRun = (outcome: GrokOutcome | null) => {
       const next = outcome ? { ...started, finishedAt: Date.now(), outcome } : null;
       setMyRun(next);
@@ -161,12 +164,12 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
         console.error("make-plan failed, using saved demo plans", e);
         await applyFallback();
         finishRun("demo");
-        setInfo(`Grok couldn't be reached (${e instanceof Error ? e.message : String(e)}). Showing saved demo plans.`);
+        setInfo(t("board.grokUnreachable", { error: e instanceof Error ? e.message : String(e) }));
       }
       await load(); // no per-plan Grok Imagine calls any more: cards use venue photos
     } catch (e) {
       finishRun(null);
-      setErr(`We couldn't make plans right now. ${e instanceof Error ? e.message : String(e)}`);
+      setErr(t("board.planFailed", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setBusy(null);
     }
@@ -192,8 +195,8 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   if (!group) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gradient-to-b from-indigo-50 to-white p-4">
-        <p className="text-gray-600">{err ?? "Loading…"}</p>
-        {err && <a href="/" onClick={home} className="text-indigo-600 underline">Back home</a>}
+        <p className="text-gray-600">{err ?? t("common.loading")}</p>
+        {err && <a href="/" onClick={home} className="text-indigo-600 underline">{t("board.backHome")}</a>}
       </div>
     );
   }
@@ -205,30 +208,30 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   return (
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-white">
       <div className="mx-auto max-w-md space-y-4 p-4">
-        <header className="flex items-center gap-3">
+        <header className="flex items-center gap-3 max-sm:pe-16">
           <a
             href="/"
             onClick={home}
-            aria-label="Back to your groups"
+            aria-label={t("board.backAria")}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-indigo-600 shadow-md transition-colors hover:bg-indigo-50"
           >
-            ←
+            <span className="inline-block rtl:-scale-x-100">←</span>
           </a>
           <div className="min-w-0 flex-1">
-            <a href="/" onClick={home} className="text-xs font-bold uppercase tracking-wide text-indigo-600">Quorum · Your groups</a>
+            <a href="/" onClick={home} className="text-xs font-bold uppercase tracking-wide text-indigo-600">{t("board.homeLink")}</a>
             <h1 className="truncate text-2xl font-bold text-gray-900">{group.name}</h1>
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${badge.cls}`}>{badge.label}</span>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${badge.cls}`}>{t(badge.labelKey)}</span>
         </header>
 
         {!me && (
           <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
             {isClosed(group) ? (
-              "You're viewing this group's plan. It isn't taking new people."
+              t("board.viewingClosed")
             ) : (
               <>
-                You're viewing this group but haven't joined on this device.{" "}
-                <a className="inline-block py-2 font-semibold underline" href={`/join/${group.invite_code}`}>Join</a>
+                {t("board.viewingNotJoined")}{" "}
+                <a className="inline-block py-2 font-semibold underline" href={`/join/${group.invite_code}`}>{t("board.join")}</a>
               </>
             )}
           </p>
@@ -243,22 +246,22 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
         {stage === "vote" && (
           <section className="space-y-4">
             <div className="px-1">
-              <h2 className="text-lg font-bold text-gray-900">Which plan are you in for?</h2>
+              <h2 className="text-lg font-bold text-gray-900">{t("board.whichPlan")}</h2>
               <p className="text-sm text-gray-600">
-                {voted} of {members.length} voted. When everyone has voted, the most votes wins.
+                {t("board.votedCount", { voted, total: members.length })}
               </p>
             </div>
             {tied.length > 0 && (
               <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                It's a tie!{" "}
-                {me?.is_organizer ? "You're the creator, so you pick the winner below." : `Waiting for ${organizer?.display_name ?? "the creator"} to pick.`}
+                {t("board.tie")}{" "}
+                {me?.is_organizer ? t("board.tieCreator") : t("board.tieWaiting", { name: organizer?.display_name ?? t("common.theCreator") })}
               </p>
             )}
             {plans.map((p) => (
               <PlanCard
                 key={p.id}
                 plan={p}
-                labels={labelsFor(p, plans)}
+                labels={labelsFor(p, plans).map((k) => t(k))}
                 voters={members.filter((m) => m.vote_plan_id === p.id)}
                 memberCount={members.length}
                 isMyVote={me?.vote_plan_id === p.id}
@@ -274,7 +277,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
                 onClick={askGrok}
                 className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                ✨ Ask Grok for new plans (resets votes)
+                {t("board.askAgain")}
               </button>
             )}
           </section>
