@@ -1,5 +1,7 @@
 // Lobby: big QR code + Copy/Share for the invite link, members appearing live with a "ready" checkmark (never
-// their answers), this phone's private questionnaire, and the creator's "Ask Grok" button.
+// their answers), this member's "Fill out my answers" / "Edit my answers" button (the questionnaire has its own page,
+// /g/:id/answers), and the creator's "Ask Grok" button. A member who hasn't answered yet sees their button first;
+// the creator always keeps the QR code at the top.
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
 import { useT } from "../i18n/hooks";
@@ -7,26 +9,26 @@ import { avatarColor, initials } from "../lib/booking";
 import { copyText, inviteUrl as inviteUrlFor } from "../lib/invite";
 import type { Group, Member } from "../lib/supabase";
 import { GrokAvatar } from "./Grok";
-import { Questionnaire } from "./Questionnaire";
 
 type Props = {
   group: Group;
   members: Member[];
   me: Member | undefined;
   busy: boolean;
+  /** Just came back from saving answers: show a short confirmation. */
+  saved: boolean;
   onAskGrok: () => void;
-  onRefresh: () => void;
+  onOpenAnswers: () => void;
 };
 
-export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props) {
+export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswers }: Props) {
   const t = useT();
-  const [editing, setEditing] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const inviteUrl = inviteUrlFor(group.invite_code); // always the live site, even from localhost
   const ready = members.filter((m) => m.prefs_ready).length;
   const allReady = members.length > 0 && ready === members.length;
   const canForce = ready >= 2;
-  const showForm = !!me && (!me.prefs_ready || editing);
+  const answerFirst = !!me && !me.is_organizer && !me.prefs_ready;
 
   const flash = (s: string) => {
     setNote(s);
@@ -48,8 +50,37 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
     await copy();
   }
 
+  const myAnswers = me && (
+    <section className="rounded-2xl bg-white p-4 shadow-md" data-testid="my-answers">
+      {me.prefs_ready ? (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="min-w-0 flex-1 text-sm text-gray-700">{t("lobby.answersIn")}</p>
+          <button
+            onClick={onOpenAnswers}
+            className="min-h-11 shrink-0 rounded-xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
+          >
+            {t("lobby.editAnswers")}
+          </button>
+        </div>
+      ) : (
+        <>
+          <h2 className="font-semibold text-gray-900">{t("lobby.yourTurn")}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t("lobby.fillPrompt")}</p>
+          <button onClick={onOpenAnswers} className="mt-3 w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white hover:bg-indigo-700">
+            {t("lobby.fillAnswers")}
+          </button>
+        </>
+      )}
+    </section>
+  );
+
   return (
     <div className="space-y-4">
+      {saved && me?.prefs_ready && (
+        <p role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-800">{t("lobby.savedNote")}</p>
+      )}
+      {answerFirst && myAnswers}
+
       <section className="rounded-2xl bg-white p-4 text-center shadow-md">
         <p className="text-sm font-semibold text-gray-700">{t("lobby.scanToJoin")}</p>
         <p className="text-xs text-gray-500">{t("lobby.noApp")}</p>
@@ -97,27 +128,7 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
         </ul>
       </section>
 
-      {me && (
-        <section className="rounded-2xl bg-white p-4 shadow-md">
-          {showForm ? (
-            <>
-              <h2 className="mb-3 font-semibold text-gray-900">{t("lobby.yourAnswers")}</h2>
-              <Questionnaire
-                memberId={me.id}
-                onSaved={() => {
-                  setEditing(false);
-                  onRefresh();
-                }}
-              />
-            </>
-          ) : (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-gray-700">{t("lobby.answersIn")}</p>
-              <button onClick={() => setEditing(true)} className="shrink-0 text-sm font-semibold text-indigo-600">{t("lobby.edit")}</button>
-            </div>
-          )}
-        </section>
-      )}
+      {!answerFirst && myAnswers}
 
       {me?.is_organizer ? (
         <section className="space-y-2 rounded-2xl bg-gray-900 p-4 text-white shadow-md">
