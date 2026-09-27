@@ -18,7 +18,7 @@ export class InvokeError extends Error {
 }
 
 /** Calls an Edge Function and surfaces its JSON `{ error }` message on failure. */
-export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay" | "recap-image" | "parse-prefs", body: unknown): Promise<T> {
+export async function invoke<T = Record<string, unknown>>(fn: "make-plan" | "pay" | "recap-image" | "parse-prefs" | "transcribe", body: unknown): Promise<T> {
   const { data, error } = await supabase.functions.invoke(fn, { body: body as Record<string, unknown> });
   if (error) {
     let msg = error.message;

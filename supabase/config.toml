@@ -13,3 +13,6 @@ verify_jwt = false
 
 [functions.parse-prefs]
 verify_jwt = false
+
+[functions.transcribe]
+verify_jwt = false
