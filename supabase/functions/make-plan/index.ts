@@ -2,11 +2,16 @@
 // Builds 2-3 plans from the members' PRIVATE questionnaire answers (member_prefs, read with the service role),
 // not from chat. Grok (xAI chat completions, strict JSON schema, reasoning_effort "low") sees the answers
 // anonymized; the server re-checks every plan against the hard rules (budget cap, hard no's, vegetarian and
-// gluten-free food, transport, free window, opening hours) and drops failures. If Grok is unavailable or nothing it proposed survives, deterministic backup
+// gluten-free food, transport, free window, opening hours) and drops failures. If Grok is unavailable or nothing it proposed survives, backup
 // plans are built from the same answers (model "backup"). Replaces the group's plans and resets votes.
 // Grok gets at most GROK_BUDGET_MS in total (first attempt capped at GROK_FIRST_ATTEMPT_MS, the validation retry
 // only gets what is left), so a slow Grok falls back to backup plans at ~110s instead of hitting the Edge
 // Function wall-clock limit. The response carries `notice` when the backup plans had to ignore the free-time window.
+// Explicit requests in the answers ("craving pizza", "quiero sushi", "bowling") are must-include: Grok is told which
+// catalog ids satisfy them, and honorRequests() checks and repairs the final list (solo: every plan anchored on a
+// request; group: each request in at least one plan), unless a request conflicts with a hard rule. Grok only sees
+// catalog items that pass the hard rules on their own, shuffled per call, and backup plans break ties randomly, so
+// the same answers don't always produce the same three plans.
 // Nothing written or returned names a member or reveals one person's answers.
 // Secrets: GROK_API_KEY (or XAI_API_KEY), optional GROK_MODEL.
 
@@ -17,16 +22,20 @@ import { schemaForRequest, validateSchema } from "../_shared/logic.ts";
 import {
   backupPlans,
   type CatalogEntry,
+  catalogForGrok,
   type GrokPlan,
   grokPayload,
   groupNeeds,
   type GroupNeeds,
+  honorRequests,
   normalizeGrokPlans,
   PREFS_PLAN_PROMPT,
   PREFS_PLAN_SCHEMA,
   type PlanRow,
   readPrefs,
   settleGlutenFree,
+  settleRequests,
+  unmetRequests,
 } from "../_shared/prefsPlan.ts";
 import type { Preferences } from "../_shared/preferences.ts";
 
@@ -36,9 +45,9 @@ const GROK_FIRST_ATTEMPT_MS = 75_000;
 const GROK_BUDGET_MS = 110_000; // total across both attempts; leaves room under the 150s wall-clock limit
 const GROK_MIN_RETRY_MS = 5_000; // skip the retry if less than this is left
 const catalog = CATALOG_FILE.activities as unknown as CatalogEntry[];
-const requestSchema = schemaForRequest(PREFS_PLAN_SCHEMA as unknown as Record<string, unknown>, catalog.map((c) => c.id));
 
-async function callGrok(userPayload: unknown, model: string, apiKey: string): Promise<GrokPlan[]> {
+async function callGrok(userPayload: unknown, ids: string[], model: string, apiKey: string): Promise<GrokPlan[]> {
+  const requestSchema = schemaForRequest(PREFS_PLAN_SCHEMA as unknown as Record<string, unknown>, ids);
   let lastErrors: string[] = [];
   const started = Date.now();
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -94,15 +103,20 @@ async function planWithGrok(all: Preferences[], needs: GroupNeeds, names: string
     return null;
   }
   const model = Deno.env.get("GROK_MODEL") || DEFAULT_MODEL;
+  const allowed = catalogForGrok(catalog, needs, Math.random);
+  if (allowed.length === 0) return null; // nothing passes the hard rules: the backup path explains
   try {
-    const raw = await callGrok(grokPayload(all, needs, catalog), model, apiKey);
-    const { plans, dropped } = normalizeGrokPlans(raw, catalog, needs, names);
+    const payload = grokPayload(all, needs, allowed, Math.floor(Math.random() * 1_000_000));
+    const raw = await callGrok(payload, allowed.map((c) => c.id), model, apiKey);
+    const { plans: valid, dropped } = normalizeGrokPlans(raw, catalog, needs, names);
     if (dropped.length) console.warn("make-plan: dropped Grok plans:", dropped); // server log only
-    if (plans.length === 0) {
+    if (valid.length === 0) {
       console.warn("make-plan: no Grok plan passed the hard rules, using backup plans");
       return null;
     }
-    return { plans, model };
+    const missed = unmetRequests(valid, needs);
+    if (missed.length) console.warn("make-plan: repairing Grok plans for requests:", missed); // keys only, no names
+    return { plans: honorRequests(valid, catalog, needs, Math.random), model };
   } catch (err) {
     console.error("make-plan: Grok failed, using backup plans:", err instanceof Error ? err.message : err);
     return null;
@@ -128,12 +142,12 @@ Deno.serve(serveJson(async (body) => {
   const answered = new Map((rows ?? []).filter((r) => r.prefs).map((r) => [r.member_id as string, r.prefs as unknown]));
   const all = roster.filter((m) => answered.has(m.id)).map((m) => readPrefs(answered.get(m.id)));
   const needed = Math.min(2, roster.length);
-  if (all.length < Math.max(1, needed)) throw new HttpError(400, "Wait until at least 2 people have answered.");
+  if (all.length < Math.max(1, needed)) throw new HttpError(400, needed === 1 ? "Answer the questions first." : "Wait until at least 2 people have answered.");
 
-  const needs = settleGlutenFree(groupNeeds(all, roster.length), catalog);
+  const needs = settleRequests(settleGlutenFree(groupNeeds(all, roster.length), catalog), catalog);
   const names = roster.map((m) => m.display_name);
   const fromGrok = await planWithGrok(all, needs, names);
-  const backup = fromGrok ? null : backupPlans(catalog, needs);
+  const backup = fromGrok ? null : backupPlans(catalog, needs, Math.random);
   const plans: PlanRow[] = fromGrok?.plans ?? backup!.plans;
   const notice = backup?.notice ?? null;
   const model = fromGrok?.model ?? "backup";
