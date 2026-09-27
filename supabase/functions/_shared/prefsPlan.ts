@@ -55,12 +55,33 @@ export const DAY = "Sat"; // no date on the questionnaire: plans are for the com
 const VEG = /\b(veg\w*t[ae]r[iy]?an|vegan|veggie|plant[- ]based)\b/i;
 
 // Gluten-free, loosely spelled: "gluten free", "gluten-free", "glutenfree", "glutten fre", "GF", "celiac", "coeliac",
-// "no gluten", "can't have gluten", "gluten intolerant", "gluten allergy".
+// "no gluten", "can't have gluten", "I don't eat gluten", "gluten intolerant", "gluten allergy".
 const GLUTEN = String.raw`glu+t+[aeiou]?n`;
 export const GLUTEN_FREE = new RegExp(
-  String.raw`\b(?:co?eliac|gf|${GLUTEN}[\s-]*fr+e+e?|(?:no|zero|avoid|avoiding|without|non|can'?t (?:have|eat|do)|allergic to|intolerant to|sensitive to)[\s-]+${GLUTEN}|${GLUTEN}[\s-]*(?:intoleran\w*|allerg\w*|sensitiv\w*))\b`,
-  "i",
+  String.raw`\b(?:co?eliac|gf|${GLUTEN}[\s-]*fr+e+e?|(?:no|zero|avoid|avoiding|without|non|(?:can'?t|cannot|can not|don'?t|do not|doesn'?t|won'?t) (?:have|eat|do|tolerate)|allergic to|intolerant to|sensitive to)[\s-]+${GLUTEN}|${GLUTEN}[\s-]*(?:intoleran\w*|allerg\w*|sensitiv\w*))\b`,
+  "gi",
 );
+/** A negation earlier in the same clause: "I'm not gluten free", "not celiac", "no longer GF". */
+const GF_NEGATED = /(?:\b(?:not|no longer|never)\b|n'?t\b)/i;
+/** "my gf", "his GF": girlfriend, not gluten-free. */
+const GF_PARTNER = /\b(?:my|his|her|your|their|our|a)\s+$/i;
+
+/**
+ * True if the text says the person is gluten-free. Works per clause (split on , ; . ! ? newline and "but"), so
+ * "I'm not gluten free" and "gluten is fine" don't count, while "not picky, but gluten-free" does.
+ */
+export function saysGlutenFree(text: string): boolean {
+  for (const clause of unCurl(text).split(/[,;.!?\n]|\bbut\b/i)) {
+    for (const m of clause.matchAll(GLUTEN_FREE)) {
+      const before = clause.slice(0, m.index);
+      if (/^gf$/i.test(m[0]) && GF_PARTNER.test(before)) continue;
+      // The positive phrases that contain their own negation ("no gluten", "don't eat gluten") only look before them.
+      if (GF_NEGATED.test(before)) continue;
+      return true;
+    }
+  }
+  return false;
+}
 
 /** Fewer GF-friendly food stops than this (after budget, veg, transit and hard no's) -> "soft" gluten-free mode. */
 export const MIN_GF_FOOD = 2;
@@ -246,7 +267,7 @@ export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
     capCents: budgets.length ? Math.min(...budgets) : null,
     vegetarian: all.some((p) => VEG.test(p.dietary)),
     // Strict until settleGlutenFree() checks the catalog. Dietary is the main field; "other" catches "celiac" notes.
-    glutenFree: all.some((p) => GLUTEN_FREE.test(unCurl(`${p.dietary} ${p.other}`))) ? "strict" : "off",
+    glutenFree: all.some((p) => saysGlutenFree(p.dietary) || saysGlutenFree(p.other)) ? "strict" : "off",
     transitOnly: all.some((p) => TRANSIT.test(unCurl(p.other)) && !RIDESHARE.test(p.other)),
     windowFrom,
     windowUntil,
