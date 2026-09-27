@@ -47,4 +47,4 @@ STEP 2: PROPOSE 2 OR 3 PLANS
 ## Notes for the team
 - If Grok returns an id outside the catalog, a wrong sum, or a cap violation that isn't flagged, the server fixes the numbers,
   re-flags `fits_everyone` / `over_cap_member_names`, and adds `server_warnings` to the saved row. That way the demo never shows a hidden overcharge.
-- Voice notes: transcribe them first (browser Web Speech API or xAI speech-to-text) and send the text as `transcript`.
+- Voice notes: the app transcribes them with Grok Voice (`transcribe` Edge Function → `POST https://api.x.ai/v1/stt`) and sends the text as `transcript`. Browser speech-to-text is only a fallback if Grok Voice is down.

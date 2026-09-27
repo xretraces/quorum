@@ -1,14 +1,17 @@
 // src/components/GroupChat.tsx: real-time group chat using Supabase Realtime
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type Message, myMemberId, supabase } from "../lib/supabase";
+import { VoiceButton } from "./VoiceButton";
 
 type Props = {
   groupId: string;
   memberName: string;
   onTranscriptChange?: (transcript: string) => void;
+  onVoiceError?: (message: string) => void;
+  onVoiceInfo?: (message: string) => void;
 };
 
-export function GroupChat({ groupId, memberName, onTranscriptChange }: Props) {
+export function GroupChat({ groupId, memberName, onTranscriptChange, onVoiceError, onVoiceInfo }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
@@ -51,20 +54,30 @@ export function GroupChat({ groupId, memberName, onTranscriptChange }: Props) {
     onTranscriptChange?.(transcript);
   }, [messages, onTranscriptChange]);
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    if (!text.trim() || sending) return;
+  async function postMessage(body: string) {
+    const trimmed = body.trim();
+    if (!trimmed || sending) return;
     setSending(true);
     try {
-      await supabase.from("messages").insert({
+      const { error } = await supabase.from("messages").insert({
         group_id: groupId,
         member_id: meId,
         sender_name: memberName,
-        text: text.trim(),
+        text: trimmed,
       });
+      if (error) throw error;
       setText("");
     } finally {
       setSending(false);
+    }
+  }
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      await postMessage(text);
+    } catch (err) {
+      onVoiceError?.(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -99,8 +112,17 @@ export function GroupChat({ groupId, memberName, onTranscriptChange }: Props) {
           type="text"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="What do you want to do?"
+          placeholder="Type or tap 🎙 — budget, diet, time, ride…"
           className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        />
+        <VoiceButton
+          disabled={sending}
+          extraKeyterms={[memberName]}
+          idleLabel="🎙"
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          onTranscript={(spoken) => postMessage(spoken)}
+          onError={onVoiceError}
+          onInfo={onVoiceInfo}
         />
         <button
           type="submit"

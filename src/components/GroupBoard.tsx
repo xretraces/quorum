@@ -8,8 +8,7 @@ import { GroupChat } from "./GroupChat";
 import { LockedPlan } from "./LockedPlan";
 import { PlanCard } from "./PlanCard";
 import { TOO_EXPENSIVE } from "./RejectButton";
-
-type SpeechRec = { lang: string; start: () => void; onresult: (e: { results: { transcript: string }[][] }) => void; onerror: () => void };
+import { VoiceButton } from "./VoiceButton";
 
 export function GroupBoard({ groupId }: { groupId: string }) {
   const [group, setGroup] = useState<Group | null>(null);
@@ -146,17 +145,10 @@ export function GroupBoard({ groupId }: { groupId: string }) {
     if (i.error) throw i.error;
   }
 
-  // TODO(grok-voice): swap browser speech-to-text for Grok Voice / xAI speech-to-text (SpaceXAI challenge).
-  function dictate() {
-    const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
-    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!SR) return setErr("Speech recognition isn't supported in this browser (try Chrome).");
-    const rec = new SR();
-    rec.lang = "en-US";
-    rec.onresult = (e) => setNotes((t) => `${t ? `${t}\n` : ""}${me?.display_name ?? "Me"} (voice): ${e.results[0][0].transcript}`);
-    rec.onerror = () => setErr("Voice recognition failed. Try again.");
-    rec.start();
-  }
+  const appendVoiceNote = (spoken: string) => {
+    const who = me?.display_name ?? "Me";
+    setNotes((t) => `${t ? `${t}\n` : ""}${who} (voice): ${spoken}`);
+  };
 
   if (!group) {
     return (
@@ -236,7 +228,14 @@ export function GroupBoard({ groupId }: { groupId: string }) {
         {(!locked || rejections.length > 0) && (
           <section className="space-y-3 rounded-2xl bg-white p-4 shadow-md">
             <h2 className="font-semibold text-gray-900">Group Chat</h2>
-            <GroupChat groupId={groupId} memberName={me?.display_name ?? "Guest"} onTranscriptChange={setChatTranscript} />
+            <p className="text-sm text-gray-600">Type or tap 🎙 — Grok Voice transcribes budget, diet, time, and rides into the chat.</p>
+            <GroupChat
+              groupId={groupId}
+              memberName={me?.display_name ?? "Guest"}
+              onTranscriptChange={setChatTranscript}
+              onVoiceError={setErr}
+              onVoiceInfo={(msg) => { setErr(null); setInfo(msg); }}
+            />
           </section>
         )}
 
@@ -260,9 +259,13 @@ export function GroupBoard({ groupId }: { groupId: string }) {
               >
                 {busy === "grok" ? "Grok is planning…" : plans.length ? "✨ Generate new plans" : "✨ Generate Plan"}
               </button>
-              <button onClick={dictate} className="rounded-xl border border-gray-300 px-4 py-3 text-gray-700 transition-colors hover:bg-gray-50">
-                🎙 Voice
-              </button>
+              <VoiceButton
+                disabled={!!busy}
+                extraKeyterms={members.map((m) => m.display_name)}
+                onTranscript={appendVoiceNote}
+                onError={setErr}
+                onInfo={(msg) => { setErr(null); setInfo(msg); }}
+              />
             </div>
           </section>
         )}

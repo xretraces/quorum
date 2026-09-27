@@ -5,8 +5,8 @@
 ## Stack
 
 - **Web:** React 19 + Vite + TypeScript + Tailwind v4 at the repo root (`src/`), `@supabase/supabase-js`, Stripe Payment Element
-- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `pay`, `recap-image`
-- **AI:** xAI Grok (strict JSON-schema output), optional Grok Imagine recap card
+- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `pay`, `recap-image`, `transcribe`
+- **AI:** xAI Grok (strict JSON-schema output), Grok Voice Transcribe for speech-to-text, optional Grok Imagine recap card
 - **Payments:** Stripe **test mode** only (`capture_method=manual`)
 - **Hosting:** Vercel (web; `vercel.json` has the SPA rewrite) + Supabase (functions)
 
@@ -28,12 +28,14 @@ Create a group, then open the invite link (or enter the group code on the home s
 ```
 src/                     React app
   components/            CreateGroup (home: create + join by code), JoinGroup, GroupBoard, GroupChat,
-                         PlanCard, RejectButton, LockedPlan (status/booking), PayButton (kit, Stripe)
+                         PlanCard, RejectButton, LockedPlan (status/booking), PayButton (kit, Stripe),
+                         VoiceButton (Grok Voice push-to-talk)
   lib/supabase.ts        client, invoke() helper, types, money + budget helpers (kit web-snippet + additions)
   lib/payments.ts        pay-function calls + simulated payments fallback (no Stripe; see "Simulated payments")
   lib/fallback.ts        saved demo plans, used only if the make-plan call fails
+  lib/voice.ts           mic recorder + transcribe() call + browser speech fallback
 supabase/
-  functions/             make-plan, pay, recap-image + _shared (logic, tests, generated catalog/schema/prompt)
+  functions/             make-plan, pay, recap-image, transcribe + _shared (logic, stt, tests, generated catalog/schema/prompt)
   migrations/            20260926000001_schema.sql (kit schema.sql), 20260926000002_messages.sql (group chat)
   config.toml            verify_jwt = false for the three functions
 data/                    atlanta-activities.json (catalog; prices are approximate demo data)
@@ -59,6 +61,7 @@ Project ref **`oavxpwpdhdazhtieikju`**. Both migrations are **already applied** 
 | --- | --- |
 | Create / join group, name + spending limit (validated) | `CreateGroup.tsx`, `JoinGroup.tsx` |
 | Live group chat | `GroupChat.tsx` (`messages` + Realtime) |
+| Speak budget / prefs (Grok Voice) | `VoiceButton` in `GroupChat` + organizer notes → `transcribe` → xAI STT |
 | Generate Plan → Grok | `GroupBoard.generate()` → `make-plan` with the chat transcript |
 | Plan cards, estimated cost, per-member budget check | `PlanCard.tsx` (budget math in code: `overCapBy`) |
 | Approve / reject live | Approve = `members.vote_plan_id`; Reject = `RejectButton.tsx`; everyone refetches on Realtime |
@@ -76,15 +79,18 @@ npx supabase link --project-ref oavxpwpdhdazhtieikju
 
 # Server secrets live ONLY in Supabase function secrets (never in .env files or the repo)
 npx supabase secrets set GROK_API_KEY=xai-... STRIPE_SECRET_KEY=sk_test_...
-# optional: GROK_MODEL=grok-4.7  GROK_IMAGE_MODEL=grok-imagine-image-2.0
+# optional: GROK_MODEL=grok-4.7  GROK_IMAGE_MODEL=grok-imagine-image-2.0  GROK_STT_MODEL=grok-voice-transcribe-2.0
 
 npx supabase functions deploy make-plan   --no-verify-jwt
 npx supabase functions deploy pay         --no-verify-jwt
 npx supabase functions deploy recap-image --no-verify-jwt   # optional
+npx supabase functions deploy transcribe  --no-verify-jwt   # Grok Voice speech-to-text
 # No Docker? add --use-api
 ```
 
 `pay` refuses non-test Stripe keys. Without `STRIPE_SECRET_KEY` or a deployed `pay`, the app falls back to simulated payments (below). `SUPABASE_URL` and the service keys are injected automatically; don't set anything that starts with `SUPABASE_`. `--no-verify-jwt` is needed because `sb_publishable_` keys aren't JWTs (also set in `supabase/config.toml`); the functions check for the project's publishable key instead. That check is not auth, which is fine for a demo.
+
+`transcribe` is the Grok Voice path: the browser records a short clip and POSTs `{ audio_base64, mime_type }` to the function. The function calls `https://api.x.ai/v1/stt` with `format=true` and `language=en` so "thirty dollars" becomes "$30", plus keyterm biasing for Atlanta venues and budget slang. The xAI key never ships to the client.
 
 Local function checks (Deno 2):
 
@@ -92,7 +98,7 @@ Local function checks (Deno 2):
 export DENO_NO_PACKAGE_JSON=1   # keep Deno from reading the web app's package.json
 deno check --node-modules-dir=none supabase/functions/*/index.ts
 deno lint supabase/functions
-deno test --node-modules-dir=none supabase/functions/_shared/logic.test.ts
+deno test --node-modules-dir=none supabase/functions/_shared/logic.test.ts supabase/functions/_shared/stt.test.ts
 ```
 
 ## Deploy web (Vercel)
@@ -119,7 +125,7 @@ git push -u origin frontend-screens   # then open a PR
 
 Conflict hot spots: `GroupBoard.tsx` (A and B) and `supabase/functions/_shared/` (A and C). After editing `data/`, `schema/`, or `prompts/`, run `./scripts/sync-shared.sh` and commit the regenerated `_shared/*.ts`.
 
-**Voice:** 🎙 currently uses the browser's Web Speech API (Chrome/Edge). **TODO (SpaceXAI challenge):** swap it for Grok Voice / xAI speech-to-text (`dictate()` in `GroupBoard.tsx`). Don't block the demo on it.
+**Voice:** 🎙 is Grok Voice Transcribe (`VoiceButton` in chat + organizer notes → `transcribe` Edge Function → `POST https://api.x.ai/v1/stt`). Tap to record, tap again to stop. The transcript is posted as a normal chat message (or appended to organizer notes). If the function or xAI is down, the next tap uses the browser Web Speech API so the demo still works.
 
 ## Prompt tests
 
@@ -156,7 +162,7 @@ How it syncs: simulated state lives in `members.constraints.sim_payment` plus th
 
 **0:00, the hook (Meta: human connection).** "Every group chat has this: 40 messages, no plan, and one friend quietly can't afford the idea everyone's excited about. Quorum turns the chat into a plan that works for *everyone*, and nobody has to front the money."
 
-**0:20, chat → Grok (SpaceXAI).** The organizer creates "Saturday hang" and shares the code. Two teammates join on their phones with caps ($30, $60). In the live chat: *"Maya: vegetarian + broke, $30 max · Jon: I can drive, free after 1 · Priya: nothing over 25, no car."* Tap 🎙 for a voice note. Tap **Generate Plan**. Point out that Grok extracted Priya's $25 cap from slang, noticed two people have no car, and used only real catalog venues. Show the per-member budget check ("Maya $18 / $30 ✓").
+**0:20, chat → Grok Voice + Grok (SpaceXAI).** The organizer creates "Saturday hang" and shares the code. Two teammates join on their phones with caps ($30, $60). Tap 🎙 and speak: *"I'm Priya, nothing over twenty-five, no car."* Point out that **Grok Voice** (not the browser) transcribed it, and `$25` is written form because we send `format=true`. Then chat or speak Maya/Jon lines. Tap **Generate Plan**. Point out that Grok extracted Priya's $25 cap from slang, noticed two people have no car, and used only real catalog venues. Show the per-member budget check ("Maya $18 / $30 ✓").
 
 **0:55, live approve/reject (Meta).** Everyone approves or rejects from their own phone, and tallies update in real time. On the flagged "splurge" plan, Maya taps **Reject → Too expensive**. Every phone shows "Maya rejected the plan. Reason: too expensive." The organizer taps **Regenerate within everyone's cap**, and every new plan fits every cap. The server double-checks Grok's math ("Checked by server").
 
@@ -166,9 +172,9 @@ How it syncs: simulated state lives in `members.constraints.sim_payment` plus th
 
 **2:15, the memory (SpaceXAI: Grok Imagine).** Tap **Make a recap card**. Close: "AI that plans *with* your friends, and money that moves only when everyone says yes."
 
-Judging hooks. **Meta:** real-world connection, with AI synthesizing the group discussion. **Visa:** GenAI from discovery to decision to budget personalization to secure checkout, with manual capture as the consent layer. **SpaceXAI:** Grok structured outputs, Grok Imagine, voice (upgrade to Grok Voice), and built with Cursor. The frame is *financial inclusion in social life*.
+Judging hooks. **Meta:** real-world connection, with AI synthesizing the group discussion. **Visa:** GenAI from discovery to decision to budget personalization to secure checkout, with manual capture as the consent layer. **SpaceXAI:** Grok structured outputs, Grok Voice Transcribe (members speak budget/preferences), Grok Imagine, and built with Cursor. The frame is *financial inclusion in social life*.
 
-**If Grok is down on stage:** Generate Plan falls back to saved plans for this exact conversation and shows a "saved demo plan" banner. **If Stripe is down or not set up:** Lock & collect falls back to simulated holds with a "Simulated payment (test)" badge (see "Simulated payments"). To rehearse without Stripe, set `VITE_SIMULATE_PAYMENTS=true`.
+**If Grok is down on stage:** Generate Plan falls back to saved plans for this exact conversation and shows a "saved demo plan" banner. **If Grok Voice is down:** the next 🎙 tap uses the browser Web Speech API and an amber notice says so. **If Stripe is down or not set up:** Lock & collect falls back to simulated holds with a "Simulated payment (test)" badge (see "Simulated payments"). To rehearse without Stripe, set `VITE_SIMULATE_PAYMENTS=true`.
 
 ## Security notes (demo)
 
