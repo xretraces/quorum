@@ -1,4 +1,5 @@
 // src/App.tsx: simple routing without a router dependency
+// Language control lives in QuorumHeader (CreateGroup / GroupBoard) — no floating LanguageSwitcher.
 import { useCallback, useEffect, useState } from "react";
 import { CreateGroup } from "./components/CreateGroup";
 import { JoinGroup } from "./components/JoinGroup";

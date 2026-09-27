@@ -1,0 +1,234 @@
+// Shared top util nav: language (PR #15 LanguageMenu), in-app group notifications, and How-it-works info.
+// Used on CreateGroup (home) and GroupBoard so every screen keeps Joc's spring/navy chrome.
+import { useEffect, useRef, useState } from "react";
+import { LanguageMenu } from "./LanguageSwitcher";
+import { useLanguagePicker } from "../i18n/useLanguagePicker";
+import { useT } from "../i18n/hooks";
+import { useGroupNotifications, type GroupNotification, type NotifKind } from "../lib/useGroupNotifications";
+
+const utilBtn =
+  "inline-flex h-8 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
+
+const utilBtnSolid =
+  "inline-flex h-8 items-center justify-center rounded-full text-spring-deep transition-colors hover:bg-spring/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-spring-deep/40";
+
+function GlobeIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.3 2.8 3.4 5.7 3.4 8.5s-1.1 5.7-3.4 8.5c-2.3-2.8-3.4-5.7-3.4-8.5S9.7 6.3 12 3.5z" />
+    </svg>
+  );
+}
+
+function BellIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M6 10a6 6 0 1 1 12 0c0 4.5 1.5 5.5 2.5 6.5h-17C4.5 15.5 6 14.5 6 10z" />
+      <path d="M10 20a2.2 2.2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+function InfoIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5" />
+      <circle cx="12" cy="8" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function notifText(t: (k: string, v?: Record<string, string | number>) => string, n: GroupNotification): string {
+  const name = n.name ?? "";
+  const map: Record<NotifKind, string> = {
+    joined: t("notif.joined", { name }),
+    ready: t("notif.ready", { name }),
+    allReady: t("notif.allReady"),
+    plansReady: t("notif.plansReady"),
+    voted: t("notif.voted", { name }),
+    winner: t("notif.winner", { name: name || t("notif.thePlan") }),
+  };
+  return map[n.kind];
+}
+
+type Tone = "onSpring" | "onLight";
+
+type Props = {
+  /** When set, the bell listens to this group's realtime events. */
+  groupId?: string | null;
+  /** onSpring = white icons on Joc's blue home; onLight = navy/spring on white board. */
+  tone?: Tone;
+  className?: string;
+  /** Show the "quorum" wordmark to the left (home). */
+  showLogo?: boolean;
+};
+
+export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = false, className = "" }: Props) {
+  const t = useT();
+  const { shortCode, label: langLabel } = useLanguagePicker();
+  const { items, unread, markRead, empty, isUnread } = useGroupNotifications(groupId);
+  const [bellOpen, setBellOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const bellRef = useRef<HTMLDivElement>(null);
+
+  const btn = tone === "onSpring" ? utilBtn : utilBtnSolid;
+  const navCls =
+    tone === "onSpring"
+      ? "flex items-center gap-0.5 rounded-full border border-white/40 bg-white/15 py-1 pl-1.5 pr-1 backdrop-blur-sm"
+      : "flex items-center gap-0.5 rounded-full border border-navy/15 bg-white/90 py-1 pl-1.5 pr-1 shadow-sm backdrop-blur-sm";
+  const divider = tone === "onSpring" ? "h-5 w-px bg-white/30" : "h-5 w-px bg-navy/20";
+
+  useEffect(() => {
+    if (!bellOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setBellOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [bellOpen]);
+
+  function openBell() {
+    setBellOpen((o) => !o);
+    if (!bellOpen) markRead();
+  }
+
+  return (
+    <>
+      <div className={`flex items-center justify-between gap-3 ${className}`}>
+        {showLogo ? (
+          <p className="font-logo text-2xl font-semibold tracking-tight text-white lowercase sm:text-3xl">quorum</p>
+        ) : (
+          <span />
+        )}
+        <nav className={navCls} aria-label={t("header.utilsAria")}>
+          <LanguageMenu className="relative inline-flex">
+            <span className={`${btn} pointer-events-none gap-1 px-2.5 text-[13px] font-semibold tracking-wide`} aria-hidden>
+              <GlobeIcon />
+              {shortCode}
+            </span>
+            <span className="sr-only">{langLabel}</span>
+          </LanguageMenu>
+          <span className={divider} aria-hidden />
+          <div className="relative" ref={bellRef}>
+            <button
+              type="button"
+              className={`${btn} relative w-8`}
+              aria-label={t("notif.label")}
+              aria-expanded={bellOpen}
+              aria-haspopup="dialog"
+              onClick={openBell}
+            >
+              <BellIcon />
+              {unread > 0 && (
+                <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sun px-1 text-[10px] font-bold text-navy">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </button>
+            {bellOpen && (
+              <div
+                role="dialog"
+                aria-label={t("notif.label")}
+                className="absolute end-0 top-[calc(100%+0.4rem)] z-50 w-[min(18.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-navy/10 bg-white text-navy shadow-xl"
+              >
+                <div className="border-b border-navy/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-navy/60">
+                  {t("notif.title")}
+                </div>
+                {empty ? (
+                  <p className="px-3 py-4 text-sm text-navy/70">
+                    {groupId ? t("notif.emptyGroup") : t("notif.emptyHome")}
+                  </p>
+                ) : (
+                  <ul className="max-h-72 overflow-y-auto py-1">
+                    {items.map((n) => (
+                      <li
+                        key={n.key}
+                        className={`border-b border-navy/5 px-3 py-2.5 text-sm last:border-0 ${isUnread(n.key) ? "bg-spring/15" : ""}`}
+                      >
+                        <p className="leading-snug text-navy">{notifText(t, n)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </div>
+          <span className={divider} aria-hidden />
+          <button
+            type="button"
+            className={`${btn} w-8`}
+            aria-label={t("info.label")}
+            onClick={() => setInfoOpen(true)}
+          >
+            <InfoIcon />
+          </button>
+        </nav>
+      </div>
+
+      {infoOpen && <InfoSheet onClose={() => setInfoOpen(false)} />}
+    </>
+  );
+}
+
+function InfoSheet({ onClose }: { onClose: () => void }) {
+  const t = useT();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="quorum-info-title">
+      <button type="button" className="absolute inset-0 bg-navy/40 backdrop-blur-[2px]" aria-label={t("info.close")} onClick={onClose} />
+      <div className="relative z-10 max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl sm:p-6">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <h2 id="quorum-info-title" className="font-logo text-xl font-semibold tracking-tight text-navy">
+            {t("info.title")}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-navy/60 hover:bg-navy/5 hover:text-navy"
+            aria-label={t("info.close")}
+          >
+            ✕
+          </button>
+        </div>
+        <ol className="space-y-3 text-sm leading-relaxed text-navy/90">
+          <li><span className="font-semibold text-navy">1.</span> {t("info.step1")}</li>
+          <li><span className="font-semibold text-navy">2.</span> {t("info.step2")}</li>
+          <li><span className="font-semibold text-navy">3.</span> {t("info.step3")}</li>
+          <li><span className="font-semibold text-navy">4.</span> {t("info.step4")}</li>
+        </ol>
+        <div className="mt-4 rounded-2xl bg-spring/25 p-3 text-sm leading-relaxed text-navy">
+          <p className="font-semibold">{t("info.privacyTitle")}</p>
+          <p className="mt-1 text-navy/85">{t("info.privacyBody")}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-5 min-h-12 w-full rounded-md bg-sun px-6 text-base font-semibold text-navy transition-opacity hover:opacity-90"
+        >
+          {t("info.gotIt")}
+        </button>
+      </div>
+    </div>
+  );
+}

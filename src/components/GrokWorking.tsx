@@ -1,23 +1,13 @@
 // "Grok is working" card shown to every member while make-plan runs (up to about a minute). Steps advance on a timer from
 // the shared start time; when the response arrives the remaining steps tick off quickly, then onDone hides it.
 import { useEffect, useRef, useState } from "react";
+import { useT, useTNodes } from "../i18n/hooks";
 import type { GrokRun } from "../lib/grokRun";
 import { DemoPlanPill, GrokAvatar, GrokSays } from "./Grok";
 
-const STEPS = [
-  "Reading everyone's answers (privately)",
-  "Finding places that fit everyone",
-  "Checking every budget and hard no",
-  "Fitting everyone's free time",
-  "Picking the best 2–3 plans",
-];
-const SAYS = [
-  "is reading everyone's answers",
-  "is finding places that fit everyone",
-  "is checking every budget and hard no",
-  "is fitting everyone's free time",
-  "is picking the best 2–3 plans",
-];
+// i18n keys (src/i18n/en.json): the step list and Grok's matching "is doing X…" line.
+const STEPS = ["working.step0", "working.step1", "working.step2", "working.step3", "working.step4"];
+const SAYS = ["working.says0", "working.says1", "working.says2", "working.says3", "working.says4"];
 /** Seconds after the start at which each step becomes active. The last one stays active until the response. */
 const STEP_AT_S = [0, 5, 14, 26, 40];
 const FINISH_STEP_MS = 220;
@@ -27,6 +17,8 @@ const SLOW_AFTER_S = 75;
 const startedSteps = (elapsedS: number) => STEP_AT_S.filter((t) => elapsedS >= t).length;
 
 export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boolean; onDone: () => void }) {
+  const t = useT();
+  const tNodes = useTNodes();
   const [now, setNow] = useState(() => Date.now());
   const ref = useRef<HTMLElement>(null);
   const finished = run.finishedAt !== null;
@@ -68,21 +60,21 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
         <GrokAvatar size={32} />
         <div className="min-w-0 flex-1 leading-tight">
           <p className="text-sm font-bold text-gray-900">Grok</p>
-          <p className="text-xs text-gray-500">Your group's planner</p>
+          <p className="text-xs text-gray-500">{t("working.subtitle")}</p>
         </div>
         <span className="font-mono text-xs tabular-nums text-indigo-400">{clock}</span>
       </div>
 
       <p className="text-lg text-gray-900">
         {allDone ? (
-          <span className="font-semibold">{demo ? (backup ? "Backup plans are ready" : "Demo plans are ready") : "Grok's plans are ready"}</span>
+          <span className="font-semibold">{t(demo ? (backup ? "working.readyBackup" : "working.readyDemo") : "working.readyGrok")}</span>
         ) : (
           <span key={doneCount} className="shimmer-text">
-            <b>Grok</b> {SAYS[Math.min(doneCount, SAYS.length - 1)]}…
+            {tNodes(SAYS[Math.min(doneCount, SAYS.length - 1)], { grok: <b>Grok</b> })}
           </span>
         )}
       </p>
-      {!isMine && !allDone && <p className="-mt-2 text-xs text-gray-500">{run.by} asked Grok for plans. Hang tight.</p>}
+      {!isMine && !allDone && <p className="-mt-2 text-xs text-gray-500">{t("working.askedBy", { name: run.by })}</p>}
 
       <ol className="space-y-2.5">
         {STEPS.map((label, i) => {
@@ -103,7 +95,7 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
                   state === "done" ? "text-gray-700" : state === "active" ? "font-semibold text-indigo-700" : "text-gray-400"
                 }`}
               >
-                {label}
+                {t(label)}
               </span>
             </li>
           );
@@ -120,17 +112,17 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
       {!allDone && (
         <p className="text-xs text-gray-500">
           {elapsedS > SLOW_AFTER_S
-            ? "Taking longer than usual. If Grok doesn't answer, Quorum picks backup plans from everyone's answers."
-            : "Usually takes about a minute. Everyone in the group sees this."}
+            ? t("working.slow")
+            : t("working.usual")}
         </p>
       )}
       {allDone && (
         <GrokSays tag={demo && <DemoPlanPill backup={backup} />}>
           {backup
-            ? "I didn't get an answer back this time, so Quorum picked these from everyone's answers. Tap \"I'm in\" on your favorite."
+            ? t("working.doneBackup")
             : demo
-              ? "I couldn't be reached, so these are saved demo plans. Tap \"I'm in\" on your favorite."
-              : "Tap \"I'm in\" on your favorite. Everyone votes from their own phone."}
+              ? t("working.doneDemo")
+              : t("working.doneGrok")}
         </GrokSays>
       )}
     </section>

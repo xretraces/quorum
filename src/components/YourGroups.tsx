@@ -1,6 +1,8 @@
 // "Your groups" on the home screen: every group this device created or joined, newest activity first.
 // One PostgREST query returns each group with its member count; Realtime keeps it fresh.
 import { useCallback, useEffect, useState } from "react";
+import { useLanguage, useT } from "../i18n/hooks";
+import type { TFunction } from "../i18n/context";
 import { forgetGroup, myGroupIds, statusBadge, supabase } from "../lib/supabase";
 
 type Row = {
@@ -10,10 +12,10 @@ type Row = {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto", style: "short" });
-function ago(iso: string) {
+function ago(iso: string, lang: string, t: TFunction) {
+  const rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto", style: "short" });
   const s = (new Date(iso).getTime() - Date.now()) / 1000;
-  if (s > -45) return "just now";
+  if (s > -45) return t("groups.justNow");
   for (const [unit, secs] of [["day", 86400], ["hour", 3600], ["minute", 60]] as const) {
     if (Math.abs(s) >= secs) return rtf.format(Math.round(s / secs), unit);
   }
@@ -23,6 +25,8 @@ function ago(iso: string) {
 const activityOf = (g: Row) => g.created_at;
 
 export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
+  const t = useT();
+  const { lang } = useLanguage();
   const [ids, setIds] = useState(() => myGroupIds());
   const [groups, setGroups] = useState<Row[] | null>(null);
   const [, setTick] = useState(0);
@@ -79,9 +83,9 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
 
   return (
     <section>
-      <h2 className="mb-3 text-center text-sm font-semibold text-navy/80">Your groups</h2>
+      <h2 className="mb-3 text-center text-sm font-semibold text-navy/80">{t("groups.title")}</h2>
       {groups === null ? (
-        <p className="py-3 text-center text-sm text-navy/70">Loading…</p>
+        <p className="py-3 text-center text-sm text-navy/70">{t("common.loading")}</p>
       ) : (
         <ul className="space-y-2">
           {groups.map((g) => {
@@ -95,13 +99,13 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold">{g.name}</span>
-                      <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${s.cls}`}>{s.label}</span>
+                      <span dir="auto" className="truncate font-semibold">{g.name}</span>
+                      <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-medium ${s.cls}`}>{t(s.labelKey)}</span>
                     </div>
-                    <p className="mt-0.5 truncate text-sm text-navy/70">{count} {count === 1 ? "person" : "people"}</p>
+                    <p className="mt-0.5 truncate text-sm text-navy/70">{t("groups.people", { count })}</p>
                   </div>
                   <div className="shrink-0 text-right text-xs text-navy/60">
-                    <div>{ago(activityOf(g))}</div>
+                    <div>{ago(activityOf(g), lang, t)}</div>
                   </div>
                 </button>
               </li>

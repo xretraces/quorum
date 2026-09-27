@@ -1,17 +1,18 @@
 // Group board: lobby (QR invite, live members + ready checks, private questionnaire) -> the creator asks Grok
 // (make-plan reads everyone's private answers server-side) with the shared "Grok is working" steps -> plan cards
-// with Grok Imagine pictures and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
+// with real venue photos and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
 // breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useT } from "../i18n/hooks";
 import { buildFallbackPlans } from "../lib/fallback";
 import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
+import { isClosed } from "../lib/invite";
 import { type Group, invoke, InvokeError, type Member, myMemberId, type Plan, statusBadge, supabase } from "../lib/supabase";
 import { FinalPlan } from "./FinalPlan";
 import { GrokWorking } from "./GrokWorking";
 import { Lobby } from "./Lobby";
 import { PlanCard } from "./PlanCard";
-
-const PAINT_WINDOW_MS = 2 * 60_000; // other phones show "painting" this long after plans appear
+import { QuorumHeader } from "./QuorumHeader";
 
 /** Live tally: the winner once every member has voted and one plan has the most votes. */
 function tally(plans: Plan[], members: Member[]) {
@@ -25,21 +26,24 @@ function tally(plans: Plan[], members: Member[]) {
   return { voted, allVoted, winner: allVoted && leaders.length === 1 ? leaders[0] : null, tied: allVoted && leaders.length > 1 ? leaders : [] };
 }
 
+/** i18n keys of the plan's badges. */
 function labelsFor(plan: Plan, plans: Plan[]) {
   const min = Math.min(...plans.map((p) => p.per_person_cents));
   const out: string[] = [];
-  if (plan.fits_everyone) out.push("Fits everyone");
-  if (plans.length > 1 && plan.per_person_cents === min && plans.some((p) => p.per_person_cents !== min)) out.push("Cheapest");
+  if (plan.fits_everyone) out.push("plan.fitsEveryone");
+  if (plans.length > 1 && plan.per_person_cents === min && plans.some((p) => p.per_person_cents !== min)) out.push("plan.cheapest");
   return out;
 }
 
 export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () => void }) {
+  const t = useT();
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false); // translated at render, so load() stays language-independent
   const [painting, setPainting] = useState<Set<string>>(new Set());
   const [myRun, setMyRun] = useState<GrokRun | null>(null);
   const [dismissedRun, setDismissedRun] = useState<number | null>(null);
@@ -58,7 +62,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       supabase.from("plans").select("*").eq("group_id", groupId).order("option_index"),
     ]);
     if (g.error) setErr(g.error.message);
-    else if (!g.data) setErr("Group not found. Please check the group code.");
+    else if (!g.data) setNotFound(true);
     else setGroup(g.data as Group);
     setMembers((m.data ?? []) as Member[]);
     setPlans((p.data ?? []) as Plan[]);
@@ -106,7 +110,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       }));
   }, [groupId]);
 
-  // Winner without a picture (per-plan pictures failed or recap-image isn't redeployed): the creator asks once.
+  // Grok Imagine only paints the WINNING plan's poster (plan cards show real venue photos): the creator asks once.
   useEffect(() => {
     if (!winner || !me?.is_organizer || winner.recap_image_url || group?.recap_image_url) return;
     if (painting.has(winner.id) || finalRecapAsked.current === winner.id) return;
@@ -144,7 +148,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     setBusy("grok");
     setErr(null);
     setInfo(null);
-    const started: GrokRun = { startedAt: Date.now(), finishedAt: null, outcome: "working", by: me?.display_name ?? "The creator" };
+    const started: GrokRun = { startedAt: Date.now(), finishedAt: null, outcome: "working", by: me?.display_name ?? t("common.theCreatorStart") };
     const finishRun = (outcome: GrokOutcome | null) => {
       const next = outcome ? { ...started, finishedAt: Date.now(), outcome } : null;
       setMyRun(next);
@@ -153,24 +157,21 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
     setMyRun(started);
     announce(started);
     try {
-      let fresh: Plan[];
       try {
         const res = await invoke<{ plans: Plan[]; source: "grok" | "backup" }>("make-plan", { group_id: groupId });
-        fresh = res.plans ?? [];
         finishRun(res.source === "backup" ? "backup" : "grok");
       } catch (e) {
         // A deliberate refusal (not enough answers, nothing fits, already decided) is shown as is.
         if (e instanceof InvokeError && e.fromFunction && e.status !== undefined && [400, 404, 409, 422].includes(e.status)) throw e;
         console.error("make-plan failed, using saved demo plans", e);
-        fresh = await applyFallback();
+        await applyFallback();
         finishRun("demo");
-        setInfo(`Grok couldn't be reached (${e instanceof Error ? e.message : String(e)}). Showing saved demo plans.`);
+        setInfo(t("board.grokUnreachable", { error: e instanceof Error ? e.message : String(e) }));
       }
-      await load();
-      fresh.filter((p) => !p.recap_image_url).forEach((p) => paint(p.id));
+      await load(); // no per-plan Grok Imagine calls any more: cards use venue photos
     } catch (e) {
       finishRun(null);
-      setErr(`We couldn't make plans right now. ${e instanceof Error ? e.message : String(e)}`);
+      setErr(t("board.planFailed", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setBusy(null);
     }
@@ -196,40 +197,51 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   if (!group) {
     return (
       <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4">
-        <p className="relative z-10 text-gray-600">{err ?? "Loading…"}</p>
-        {err && <a href="/" onClick={home} className="relative z-10 text-spring-deep underline">Back home</a>}
+        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
+          <QuorumHeader groupId={groupId} tone="onLight" />
+        </div>
+        <p className="relative z-10 text-gray-600">{err ?? (notFound ? t("board.groupNotFound") : t("common.loading"))}</p>
+        {(err || notFound) && <a href="/" onClick={home} className="relative z-10 text-spring-deep underline">{t("board.backHome")}</a>}
       </div>
     );
   }
 
   const organizer = members.find((m) => m.is_organizer);
-  const recentlyMade = (p: Plan) => !!p.created_at && Date.now() - new Date(p.created_at).getTime() < PAINT_WINDOW_MS;
-  const isPainting = (p: Plan) => painting.has(p.id) || (!p.recap_image_url && recentlyMade(p));
   const stage = grokRun ? "grok" : winner ? "final" : plans.length ? "vote" : "lobby";
   const badge = winner ? statusBadge("decided") : statusBadge(group.status);
 
   return (
     <div className="quorum-inner relative isolate min-h-dvh">
       <div className="relative z-10 mx-auto max-w-md space-y-4 p-4">
+        <div className="flex justify-end">
+          <QuorumHeader groupId={groupId} tone="onLight" />
+        </div>
         <header className="flex items-center gap-3">
           <a
             href="/"
             onClick={home}
-            aria-label="Back to your groups"
+            aria-label={t("board.backAria")}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-xl text-spring-deep shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
           >
-            ←
+            <span className="inline-block rtl:-scale-x-100">←</span>
           </a>
           <div className="min-w-0 flex-1">
-            <a href="/" onClick={home} className="font-logo text-xs font-semibold tracking-tight text-spring-deep lowercase">quorum · your groups</a>
-            <h1 className="truncate text-2xl font-bold text-gray-900">{group.name}</h1>
+            <a href="/" onClick={home} className="font-logo block truncate text-xs font-semibold tracking-tight text-spring-deep lowercase">{t("board.homeLink")}</a>
+            <h1 dir="auto" className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{group.name}</h1>
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${badge.cls}`}>{badge.label}</span>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium max-sm:px-2 max-sm:text-xs ${badge.cls}`}>{t(badge.labelKey)}</span>
         </header>
 
         {!me && (
           <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-            You're viewing this group but haven't joined on this device. <a className="underline" href={`/join/${group.invite_code}`}>Join</a>
+            {isClosed(group) ? (
+              t("board.viewingClosed")
+            ) : (
+              <>
+                {t("board.viewingNotJoined")}{" "}
+                <a className="inline-block py-2 font-semibold underline" href={`/join/${group.invite_code}`}>{t("board.join")}</a>
+              </>
+            )}
           </p>
         )}
 
@@ -242,27 +254,26 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
         {stage === "vote" && (
           <section className="space-y-4">
             <div className="px-1">
-              <h2 className="text-lg font-bold text-gray-900">Which plan are you in for?</h2>
+              <h2 className="text-lg font-bold text-gray-900">{t("board.whichPlan")}</h2>
               <p className="text-sm text-gray-600">
-                {voted} of {members.length} voted. When everyone has voted, the most votes wins.
+                {t("board.votedCount", { voted, total: members.length })}
               </p>
             </div>
             {tied.length > 0 && (
               <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                It's a tie!{" "}
-                {me?.is_organizer ? "You're the creator, so you pick the winner below." : `Waiting for ${organizer?.display_name ?? "the creator"} to pick.`}
+                {t("board.tie")}{" "}
+                {me?.is_organizer ? t("board.tieCreator") : t("board.tieWaiting", { name: organizer?.display_name ?? t("common.theCreator") })}
               </p>
             )}
             {plans.map((p) => (
               <PlanCard
                 key={p.id}
                 plan={p}
-                labels={labelsFor(p, plans)}
+                labels={labelsFor(p, plans).map((k) => t(k))}
                 voters={members.filter((m) => m.vote_plan_id === p.id)}
                 memberCount={members.length}
                 isMyVote={me?.vote_plan_id === p.id}
                 canVote={!!me}
-                painting={isPainting(p)}
                 busy={!!busy}
                 onVote={() => vote(p.id)}
                 onPick={me?.is_organizer && tied.some((t) => t.id === p.id) ? () => pick(p.id) : undefined}
@@ -274,7 +285,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
                 onClick={askGrok}
                 className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                ✨ Ask Grok for new plans (resets votes)
+                {t("board.askAgain")}
               </button>
             )}
           </section>
