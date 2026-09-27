@@ -4,23 +4,23 @@
 
 Live: https://quorum-eight-mu.vercel.app · Built at HackGT 13.
 
-The creator makes a group and shows a big **QR code** (or copies/shares the link). Friends scan it and join with just a name; the lobby shows them appearing live. Each person fills a short **private questionnaire** with four fields: **Budget** (max $ per person), **Dietary**, **Availability** and **Other**. A blank field means "no preference". **Only Grok sees the answers**; everyone else just sees a ✓ Ready checkmark. When everyone is ready (or at least 2 people are and the creator taps "Plan it anyway"), the creator taps **Ask Grok**. The `make-plan` function reads the answers server-side and returns 2-3 real Atlanta plans. Budget is a hard per-person cap and hard no's are strict exclusions, and the server re-checks both. Each card shows **pictures of the venues** (freely licensed photos, or a Grok Imagine picture where no real photo of the place exists), a group-level "why it fits" line that never names anyone, and labels like "Fits everyone" / "Cheapest". Everyone taps **I'm in** on one plan. Once everyone has voted, the top plan wins (the creator breaks ties) and every phone switches live to **Your plan**, with a **Grok Imagine** poster, **Add to calendar** (.ics download) and Share.
+The creator makes a group and shows a big **QR code** (or copies/shares the link). Friends scan it and join with just a name; the lobby shows them appearing live. Each person fills a short **private questionnaire** with four fields: **Budget** (max $ per person), **Dietary**, **Availability** and **Other**. A blank field means "no preference". Instead of typing into each field, they can **tell Grok about themselves** in one sentence, spoken (🎙 Speak, transcribed by **Grok Voice**) or typed, and Grok fills the four fields for them to check and edit. **Only Grok sees the answers**; everyone else just sees a ✓ Ready checkmark. When everyone is ready (or at least 2 people are and the creator taps "Plan it anyway"), the creator taps **Ask Grok**. The `make-plan` function reads the answers server-side and returns 2-3 real Atlanta plans. Budget is a hard per-person cap, hard no's are strict exclusions, and vegetarian or gluten-free answers mean only suitable food stops; the server re-checks all of them. Each card shows **pictures of the venues** (freely licensed photos, or a Grok Imagine picture where no real photo of the place exists), a group-level "why it fits" line that never names anyone, and labels like "Fits everyone" / "Cheapest". Everyone taps **I'm in** on one plan. Once everyone has voted, the top plan wins (the creator breaks ties) and every phone switches live to **Your plan**, with a **Grok Imagine** poster, **Add to calendar** (.ics download) and Share.
 
 ## Built with Grok
 
 | Grok product | Where it's used |
 | --- | --- |
-| **Grok models** (xAI API, strict JSON-schema output) | Plans: `make-plan` turns everyone's anonymized answers into 2-3 plans. Parsing: `parse-prefs` turns a spoken answer into the four questionnaire fields. Translation: the language switcher (in progress, open PR on `feat/i18n`) |
+| **Grok models** (xAI API, strict JSON-schema output) | Plans: `make-plan` turns everyone's anonymized answers into 2-3 plans. Parsing: `parse-prefs` turns a spoken or typed sentence into the four questionnaire fields. Translation: the language switcher (in progress, open PR on `feat/i18n`) |
 | **Grok Imagine** | The winning plan's poster (`recap-image`), plus 6 pre-generated venue pictures for places without a usable real photo (`photoCredit.license = "AI-generated"` in `data/atlanta-activities.json`) |
-| **Grok Voice** | Spoken answers for the questionnaire (in progress on `feat/voice-fill`; the questionnaire already exposes `applyPreferences(partial)` for it) |
+| **Grok Voice** | Spoken answers for the questionnaire: the "Tell Grok about yourself" box records a short voice note, the `transcribe` function sends it to Grok Voice speech-to-text (`grok-voice-transcribe-2.0`, xAI `/v1/stt`), then `parse-prefs` fills the form |
 
 Built with **Cursor** and **Claude Code**.
 
 ## Stack
 
 - **Web:** React 19 + Vite + TypeScript + Tailwind v4 at the repo root (`src/`), `@supabase/supabase-js`, `qrcode.react`
-- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `parse-prefs`, `recap-image`
-- **AI:** xAI Grok models (strict JSON-schema output) and Grok Imagine
+- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `parse-prefs`, `transcribe`, `recap-image`
+- **AI:** xAI Grok models (strict JSON-schema output), Grok Voice (speech-to-text) and Grok Imagine
 - **Hosting:** Vercel (web; `vercel.json` has the SPA rewrite) + Supabase (functions)
 
 ## Quickstart
@@ -34,24 +34,27 @@ npm run dev                  # http://localhost:5173
 
 Create a group, then open the invite link (or enter the invite code on the home screen) in a second browser or an incognito window to join as another person. There's no login: each browser stores its member id per group in `localStorage` (`pp:member:<groupId>`) and the token for its private answers (`pp:token:<memberId>`).
 
-`npm run build` type-checks (`tsc -b`) and builds. `npm run lint` runs ESLint on the web app. Optional: `VITE_PUBLIC_URL` changes where invite links and the QR code point (defaults to the live site).
+`npm run build` type-checks (`tsc -b`) and builds. `npm run lint` runs ESLint on the web app. `npm test` runs the voice unit tests (Node 22+, `--experimental-strip-types`). Optional: `VITE_PUBLIC_URL` changes where invite links and the QR code point (defaults to the live site). `VITE_VOICE_PARALLEL` (`auto`, the default, means laptops only; or `on`/`off`) also runs the browser's speech recognition during a Grok Voice take as a backup transcript.
 
 ## Repo layout
 
 ```
 src/                     React app
   components/            CreateGroup (home: create + join by code), YourGroups, JoinGroup, GroupBoard, Lobby,
-                         Questionnaire, GrokWorking, PlanCard, VenuePhotos, FinalPlan, Recap
+                         Questionnaire, VoiceFill, VoiceButton, GrokWorking, PlanCard, VenuePhotos, FinalPlan, Recap
   lib/supabase.ts        client, invoke() helper, types, localStorage identity helpers
   lib/prefs.ts           private answers: claim_member / save_my_prefs / get_my_prefs RPCs
   lib/parsePrefs.ts      client for the parse-prefs function
+  lib/voice.ts           mic recording, silence detection, transcribe client, browser speech fallback
+  lib/voice-logic.ts     pure voice decisions (which transcript wins, fallbacks) + tests
+  lib/voiceFill.ts       merge rule for "Tell Grok about yourself" (fields Grok heard replace, `other` appends) + tests
   lib/calendar.ts        .ics export for the winning plan
   lib/fallback.ts        saved demo plans, used only if the make-plan call fails
 supabase/
-  functions/             make-plan, parse-prefs, recap-image + _shared (plan rules, preferences, generated catalog)
+  functions/             make-plan, parse-prefs, transcribe, recap-image + _shared (plan rules, preferences, stt, generated catalog)
   migrations/            schema + private answers (see Database)
   config.toml            verify_jwt = false for every function
-data/                    atlanta-activities.json (venue catalog; prices are approximate demo data, photo credits)
+data/                    atlanta-activities.json (venue catalog; prices are approximate demo data, gf_friendly notes, photo credits)
 public/venues/           venue pictures shown on plan cards
 scripts/sync-shared.sh   regenerate supabase/functions/_shared/catalog.ts (and friends) after editing data/
 docs/TEAM_SPEC.md        original product spec (screens/flow/UX; ignore its Express/Firebase backend)
@@ -76,7 +79,8 @@ Project ref **`oavxpwpdhdazhtieikju`**. All migrations in `supabase/migrations/`
 | --- | --- |
 | Create (group + your name) / join (name only) | `CreateGroup.tsx`, `JoinGroup.tsx` (both call `claimMember`) |
 | Lobby: QR, Copy link, Share, live members + ready checks | `Lobby.tsx` (`qrcode.react`, Realtime on `members`) |
-| Private questionnaire (Budget, Dietary, Availability, Other) | `Questionnaire.tsx` + `lib/prefs.ts` (`save_my_prefs` / `get_my_prefs` RPCs). Voice can fill it through `ref.current.applyPreferences(partial)` |
+| Private questionnaire (Budget, Dietary, Availability, Other) | `Questionnaire.tsx` + `lib/prefs.ts` (`save_my_prefs` / `get_my_prefs` RPCs) |
+| Tell Grok about yourself (speak or type) | `VoiceFill.tsx` at the top of the form: `VoiceButton` → `transcribe` (Grok Voice) → `parse-prefs` → `lib/voiceFill.ts` merges into the form via `applyPreferences`. Nothing is saved until the person taps I'm ready |
 | Ask Grok / Plan it anyway (creator) | `GroupBoard.askGrok()` → `make-plan { group_id }` + the shared "Grok is working" card (`GrokWorking.tsx`) |
 | Plans from private answers | `make-plan` + `_shared/prefsPlan.ts` (anonymized Grok call, server re-checks, backup plans) |
 | Venue pictures per plan card | `VenuePhotos.tsx`; `photo` / `photoCredit` in `data/atlanta-activities.json`, images in `public/venues/` (Wikimedia Commons / Openverse free licenses, or Grok Imagine) |
@@ -91,9 +95,9 @@ Answers live in `member_prefs`: RLS on, **no policies**, no grants for `anon`/`a
 
 ### make-plan
 
-`POST /functions/v1/make-plan { group_id }` → `{ plans, model, source: "grok" | "backup", answered, notice }`. Needs answers from at least 2 members (1 in a solo group). Hard rules checked in code: sum of catalog prices ≤ the lowest budget, no item matching a hard no from "Other" (name/category/tags plus aliases like heights → rooftop/summit), veg-friendly food if anyone is vegetarian/vegan, transit-friendly stops if anyone takes MARTA or has no car (unless they mention rideshare), and every stop inside the shared free window from "Availability" and the venue's typical hours. Plans that fail are dropped; if none survive or Grok fails, deterministic backup plans are built from the same rules. 422 if nothing in the catalog fits. Grok gets about 110 s in total before the backup plans take over.
+`POST /functions/v1/make-plan { group_id }` → `{ plans, model, source: "grok" | "backup", answered, notice }`. Needs answers from at least 2 members (1 in a solo group). Hard rules checked in code: sum of catalog prices ≤ the lowest budget, no item matching a hard no from "Other" (name/category/tags plus aliases like heights → rooftop/summit), veg-friendly food if anyone is vegetarian/vegan, gluten-free-friendly food (`gf_friendly` in the catalog) if anyone is gluten-free or celiac, transit-friendly stops if anyone takes MARTA or has no car (unless they mention rideshare), and every stop inside the shared free window from "Availability" and the venue's typical hours. Gluten-free is detected per clause ("not gluten free" and "my gf" don't count). If fewer than 2 GF-friendly food stops also pass the other rules, the rule softens: any food is allowed and the plan says "Check gluten-free options with the venue before you go." Plans that fail are dropped; if none survive or Grok fails, deterministic backup plans are built from the same rules. 422 if nothing in the catalog fits. Grok gets about 110 s in total before the backup plans take over.
 
-### parse-prefs (spoken answer → questionnaire)
+### parse-prefs (spoken or typed sentence → questionnaire)
 
 `POST /functions/v1/parse-prefs { transcript: string, current?: Partial<Preferences> }` → `{ preferences: Partial<Preferences>, heard: string }`, with only the fields the person mentioned. `Preferences` (in `supabase/functions/_shared/preferences.ts`) has the same four fields as the form:
 
@@ -104,7 +108,11 @@ Answers live in `member_prefs`: RLS on, **no policies**, no grants for `anon`/`a
 | `availability` | text, in the person's words | "Saturday after 2pm" |
 | `other` | text: getting around, hard no's, anything else | "I take MARTA, no bars" |
 
-It uses the same `GROK_API_KEY` / `GROK_MODEL` secrets as make-plan. Without a key, or if Grok fails, it returns a basic regex parse (dollar amount, diet keywords, availability phrase, full transcript in `other`) instead of an error. Empty transcripts get a 400; transcripts are cut to 2000 chars. Client: `parsePrefs(transcript, current?)` in `src/lib/parsePrefs.ts`. Older saved answers (`food`, `hardNos`, `transport`, `freeFrom`/`freeUntil`) are folded into the four fields by `normalizePrefs`.
+Values come back in English with digit times ("after six" → "after 6pm") so make-plan's rules can read them, even when the person spoke another language. It uses the same `GROK_API_KEY` / `GROK_MODEL` secrets as make-plan. Without a key, or if Grok fails, it returns a basic regex parse (dollar amount, diet keywords, availability phrase, full transcript in `other`) instead of an error. Empty transcripts get a 400; transcripts are cut to 2000 chars. Client: `parsePrefs(transcript, current?)` in `src/lib/parsePrefs.ts`, called by `VoiceFill.tsx`. Older saved answers (`food`, `hardNos`, `transport`, `freeFrom`/`freeUntil`) are folded into the four fields by `normalizePrefs`.
+
+### transcribe (Grok Voice)
+
+`POST /functions/v1/transcribe { audio_base64: string, mime_type?: string, keyterms?: string[] }` → `{ text, language, duration, model }`. Sends the voice note (up to about 45 s, 4 MB) to Grok Voice speech-to-text (`https://api.x.ai/v1/stt`, `GROK_STT_MODEL`, default `grok-voice-transcribe-2.0`) with keyterms for budgets, diets, MARTA and the catalog's venue names. 422 if it heard silence, 502 if xAI fails. The xAI key stays on the server. In the browser (`VoiceButton` + `lib/voice.ts`), tap 🎙 Speak and tap Stop, or it stops after about 2.5 s of silence. If Grok Voice fails, the browser's own speech recognition takes over.
 
 ### recap-image
 
@@ -118,10 +126,11 @@ npx supabase link --project-ref oavxpwpdhdazhtieikju
 
 # Server secrets live ONLY in Supabase function secrets (never in .env files or the repo)
 npx supabase secrets set GROK_API_KEY=xai-...
-# optional: GROK_MODEL=grok-4.7  GROK_IMAGE_MODEL=grok-imagine-image-2.0
+# optional: GROK_MODEL=grok-4.7  GROK_IMAGE_MODEL=grok-imagine-image-2.0  GROK_STT_MODEL=grok-voice-transcribe-2.0
 
 npx supabase functions deploy make-plan   --no-verify-jwt
 npx supabase functions deploy parse-prefs --no-verify-jwt
+npx supabase functions deploy transcribe  --no-verify-jwt
 npx supabase functions deploy recap-image --no-verify-jwt
 # No Docker? add --use-api
 ```
@@ -136,7 +145,7 @@ Local function checks (Deno 2):
 export DENO_NO_PACKAGE_JSON=1   # keep Deno from reading the web app's package.json
 deno check --node-modules-dir=none supabase/functions/*/index.ts
 deno lint supabase/functions
-deno test --node-modules-dir=none supabase/functions/_shared/logic.test.ts
+deno test --node-modules-dir=none supabase/functions/_shared/logic.test.ts supabase/functions/_shared/prefsPlan.test.ts supabase/functions/_shared/stt.test.ts
 ```
 
 ## Deploy web (Vercel)
@@ -153,9 +162,9 @@ Import the repo → framework **Vite** → add `VITE_SUPABASE_URL` and `VITE_SUP
 
 **0:20, QR lobby.** The creator makes "Saturday hang" and the lobby shows a big QR code. Two judges scan it with their phone camera, no app needed, join with just a name, and pop up in the member list live.
 
-**0:40, private answers.** Each phone fills the four fields: Budget, Dietary, Availability, Other (blank = no preference). For example: "$35, vegetarian, no car" · "$80, free after 5 PM Saturday, I have a car" · "$40, gluten-free, I take MARTA". Point out the 🔒 "Only Grok sees this" note: everyone else only sees a ✓ Ready checkmark. (Answering by voice with Grok Voice is in progress.)
+**0:40, private answers.** Each phone fills the four fields: Budget, Dietary, Availability, Other (blank = no preference). For example: "$35, vegetarian, no car" · "$80, free after 5 PM Saturday, I have a car" · "$40, gluten-free, I take MARTA". One judge taps **🎙 Speak** in the "Tell Grok about yourself" box and says it instead (or types it): Grok Voice transcribes it and Grok fills the four fields, marked "Filled by Grok — check and edit". Point out the 🔒 "Only Grok sees this" note: everyone else only sees a ✓ Ready checkmark.
 
-**1:05, Grok plans.** The creator taps **Ask Grok**. Every phone shows the "Grok is working" card. 20-90 s later, 2-3 real Atlanta plans appear with venue pictures and a "why it fits" line that names nobody. Point out that every plan is under the lowest budget (the server re-checks Grok's math against the catalog prices), uses veg-friendly food, and only uses places reachable by MARTA, and that nothing reveals whose constraint was whose.
+**1:05, Grok plans.** The creator taps **Ask Grok**. Every phone shows the "Grok is working" card. 20-90 s later, 2-3 real Atlanta plans appear with venue pictures and a "why it fits" line that names nobody. Point out that every plan is under the lowest budget (the server re-checks Grok's math against the catalog prices), uses veg-friendly food, only picks food stops with gluten-free options, and only uses places reachable by MARTA, and that nothing reveals whose constraint was whose.
 
 **1:40, vote.** Everyone taps **I'm in** on their favorite; counts update live on every phone. When everyone has voted, the top plan wins (the creator breaks ties).
 
