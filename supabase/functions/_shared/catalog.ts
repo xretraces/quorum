@@ -4,7 +4,7 @@ export const CATALOG_FILE = {
   "version": "2026-09-26",
   "city": "Atlanta, GA",
   "currency": "usd",
-  "photos_note": "photo = 800px JPG in public/venues/ from Wikimedia Commons or Flickr via Openverse (CC BY / CC BY-SA / CC0 / public domain only); photoCredit = author, license, Commons file page. Venues without a free photo get a gradient placeholder in the UI.",
+  "photos_note": "photo = 800px JPG in public/venues/ from Wikimedia Commons or Flickr via Openverse (CC BY / CC BY-SA / CC0 / public domain only), or pre-generated with Grok Imagine where no real photo clearly shows the place (photoCredit.license = \"AI-generated\", shown as \"Image by Grok Imagine\"); photoCredit = author, license, source page.",
   "activities": [
     {
       "id": "ponce-city-market-food-hall",
@@ -47,9 +47,9 @@ export const CATALOG_FILE = {
       ],
       "photo": "/venues/skyline-park-pcm.jpg",
       "photoCredit": {
-        "author": "JJonahJackalope",
-        "license": "CC BY-SA 4.0",
-        "source": "https://commons.wikimedia.org/wiki/File:Ponce_City_Market,_Atlanta.jpg"
+        "author": "Grok Imagine",
+        "license": "AI-generated",
+        "source": "xAI"
       }
     },
     {
@@ -318,7 +318,13 @@ export const CATALOG_FILE = {
         "group",
         "indoor-outdoor"
       ],
-      "dietary_note": "Price is a bay-time share estimate, food extra"
+      "dietary_note": "Price is a bay-time share estimate, food extra",
+      "photo": "/venues/topgolf-midtown.jpg",
+      "photoCredit": {
+        "author": "Grok Imagine",
+        "license": "AI-generated",
+        "source": "xAI"
+      }
     },
     {
       "id": "fox-bros-bbq",
@@ -337,9 +343,9 @@ export const CATALOG_FILE = {
       ],
       "photo": "/venues/fox-bros-bbq.jpg",
       "photoCredit": {
-        "author": "Nathan Cardozo",
-        "license": "CC BY-SA 2.0",
-        "source": "https://www.flickr.com/photos/55298075@N00/2828314225"
+        "author": "Grok Imagine",
+        "license": "AI-generated",
+        "source": "xAI"
       }
     },
     {
@@ -381,9 +387,9 @@ export const CATALOG_FILE = {
       ],
       "photo": "/venues/tassilis-raw-reality.jpg",
       "photoCredit": {
-        "author": "Carl Black",
-        "license": "CC BY-SA 2.0",
-        "source": "https://www.flickr.com/photos/8198029@N03/7638830838"
+        "author": "Grok Imagine",
+        "license": "AI-generated",
+        "source": "xAI"
       }
     },
     {
@@ -404,9 +410,9 @@ export const CATALOG_FILE = {
       ],
       "photo": "/venues/buford-highway-food-crawl.jpg",
       "photoCredit": {
-        "author": "Thomson200",
-        "license": "CC0",
-        "source": "https://commons.wikimedia.org/wiki/File:Stir-fried_ice_cream_on_Buford_Highway,_September_2016.jpg"
+        "author": "Grok Imagine",
+        "license": "AI-generated",
+        "source": "xAI"
       }
     },
     {
@@ -446,7 +452,13 @@ export const CATALOG_FILE = {
         "comedy",
         "indoor",
         "evening"
-      ]
+      ],
+      "photo": "/venues/dads-garage-improv.jpg",
+      "photoCredit": {
+        "author": "Grok Imagine",
+        "license": "AI-generated",
+        "source": "xAI"
+      }
     },
     {
       "id": "fernbank-museum",
