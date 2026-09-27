@@ -8,7 +8,7 @@ import { supabase } from "./supabase";
 export type { Preferences };
 
 export const EMPTY_PREFS: Preferences = {
-  budget: null, food: "", transport: null, freeFrom: null, freeUntil: null, hardNos: "", other: "",
+  budget: null, dietary: "", availability: "", other: "",
 };
 
 /**

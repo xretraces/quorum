@@ -1,19 +1,13 @@
 // Questionnaire preferences parsed from a spoken transcript (parse-prefs). Pure code, no Deno APIs, so the
-// web app can import the type too.
-
-export type Transport = "car" | "marta" | "rideshare" | "walk";
+// web app can import the type too. The form is four fields: budget, dietary, availability, other.
 
 export type Preferences = {
   budget: number | null; // max $ per person
-  food: string; // diet, allergies, cravings
-  transport: Transport | null;
-  freeFrom: string | null; // 24h "HH:MM"
-  freeUntil: string | null; // 24h "HH:MM"
-  hardNos: string; // things they won't do
+  dietary: string; // diet, allergies, cravings
+  availability: string; // when they're free, free text
   other: string;
 };
 
-export const TRANSPORTS: readonly Transport[] = ["car", "marta", "rideshare", "walk"];
 export const MAX_TRANSCRIPT_CHARS = 2000;
 const MAX_BUDGET = 1000;
 const MAX_TEXT = 500;
@@ -25,14 +19,11 @@ const MAX_TEXT = 500;
 export const PREFS_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["budget", "food", "transport", "freeFrom", "freeUntil", "hardNos", "other", "heard"],
+  required: ["budget", "dietary", "availability", "other", "heard"],
   properties: {
     budget: { type: ["number", "null"], description: "Max dollars per person, e.g. 'about 35 bucks' -> 35, 'under 50' -> 50." },
-    food: { type: ["string", "null"], description: "Diet, allergies, cravings." },
-    transport: { type: ["string", "null"], enum: [...TRANSPORTS, null] },
-    freeFrom: { type: ["string", "null"], description: "24h HH:MM, e.g. 'after 6' -> '18:00'." },
-    freeUntil: { type: ["string", "null"], description: "24h HH:MM." },
-    hardNos: { type: ["string", "null"], description: "Things they won't do, e.g. 'no bars', 'nothing with heights'." },
+    dietary: { type: ["string", "null"], description: "Diet, allergies, cravings. e.g. vegetarian, no peanuts." },
+    availability: { type: ["string", "null"], description: "When they are free, in their words. e.g. 'Saturday after 2pm'." },
     other: { type: ["string", "null"], description: "Anything else relevant to planning an outing." },
     heard: { type: "string", description: "One short sentence restating what was understood." },
   },
@@ -41,18 +32,11 @@ export const PREFS_SCHEMA = {
 export const PREFS_SYSTEM_PROMPT = `You turn one person's spoken answer into questionnaire fields for planning a group outing in Atlanta.
 Return JSON matching the schema. Use null for every field the person did not mention. Never guess.
 - budget: max dollars per person as a number ("about 35 bucks" -> 35, "under 50" -> 50).
-- transport: "train", "MARTA" or "bus" -> "marta"; "Uber" or "Lyft" -> "rideshare"; driving -> "car"; walking -> "walk".
-- freeFrom / freeUntil: 24h "HH:MM". Evening outings: "after 6" -> "18:00", "until 11" -> "23:00".
-- food: diet, allergies, cravings. hardNos: things they won't do. other: anything else relevant.
+- dietary: diet, allergies, cravings ("vegetarian, no peanuts").
+- availability: when they are free, in their words ("Saturday after 2pm", "free until 11").
+- other: anything else relevant (getting around, hard no's, vibes).
 - If "current" answers are given and the person changes or adds to a text field, return the full updated text for that field.
 - heard: one short, friendly sentence restating what you understood.`;
-
-const TRANSPORT_WORDS: [RegExp, Transport][] = [
-  [/\b(train|marta|bus)\b/i, "marta"],
-  [/\b(uber|lyft|rideshare|ride share)\b/i, "rideshare"],
-  [/\b(drive|driving|car)\b/i, "car"],
-  [/\b(walk|walking)\b/i, "walk"],
-];
 
 /** "18:00", "6:30", "18" -> "HH:MM"; anything else -> null. */
 export function normalizeTime(v: unknown): string | null {
@@ -71,9 +55,19 @@ function cleanText(v: unknown): string | undefined {
   return s === "" ? undefined : s;
 }
 
+/** Older saves used food + freeFrom/freeUntil. Fold those into the four current fields. */
+function legacyAvailability(r: Record<string, unknown>): string | undefined {
+  const from = normalizeTime(r.freeFrom);
+  const until = normalizeTime(r.freeUntil);
+  if (from && until) return `${from}–${until}`;
+  if (from) return `from ${from}`;
+  if (until) return `until ${until}`;
+  return undefined;
+}
+
 /**
- * Keeps only known keys with usable values: budget clamped to 0-1000, transport coerced to the enum,
- * times as HH:MM, empty/null values dropped (they mean "not mentioned").
+ * Keeps only known keys with usable values: budget clamped to 0-1000, text trimmed,
+ * empty/null values dropped (they mean "not mentioned").
  */
 export function normalizePrefs(raw: unknown): Partial<Preferences> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -84,20 +78,12 @@ export function normalizePrefs(raw: unknown): Partial<Preferences> {
   if (typeof budget === "number" && Number.isFinite(budget)) {
     out.budget = Math.round(Math.min(MAX_BUDGET, Math.max(0, budget)));
   }
-  const transport = typeof r.transport === "string" ? r.transport.trim().toLowerCase() : "";
-  if ((TRANSPORTS as readonly string[]).includes(transport)) out.transport = transport as Transport;
-  else if (transport) {
-    const hit = TRANSPORT_WORDS.find(([re]) => re.test(transport)); // "Uber" -> rideshare, "bus" -> marta
-    if (hit) out.transport = hit[1];
-  }
-  const freeFrom = normalizeTime(r.freeFrom);
-  if (freeFrom) out.freeFrom = freeFrom;
-  const freeUntil = normalizeTime(r.freeUntil);
-  if (freeUntil) out.freeUntil = freeUntil;
-  for (const k of ["food", "hardNos", "other"] as const) {
-    const s = cleanText(r[k]);
-    if (s !== undefined) out[k] = s;
-  }
+  const dietary = cleanText(r.dietary) ?? cleanText(r.food);
+  if (dietary) out.dietary = dietary;
+  const availability = cleanText(r.availability) ?? legacyAvailability(r);
+  if (availability) out.availability = availability;
+  const other = cleanText(r.other);
+  if (other) out.other = other;
   return out;
 }
 
@@ -106,22 +92,18 @@ const DIET_WORDS = [
   "nut allergy", "peanut allergy", "shellfish allergy",
 ];
 
+const AVAIL_WORDS = /\b(?:free|available|after|until|before|tonight|tomorrow|this weekend|(?:mon|tues|wednes|thurs|fri|satur|sun)day)\b[^.]{0,60}/i;
+
 /** Cheap no-LLM parse used when Grok is unavailable. The whole transcript goes into `other`. */
 export function fallbackParse(transcript: string): Partial<Preferences> {
   const out: Partial<Preferences> = {};
   const money = transcript.match(/\$\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*(?:dollars|bucks)\b/i);
   if (money) out.budget = Math.round(Math.min(MAX_BUDGET, Number(money[1] ?? money[2])));
 
-  let first = Infinity;
-  for (const [re, mode] of TRANSPORT_WORDS) {
-    const i = transcript.search(re);
-    if (i >= 0 && i < first) {
-      first = i;
-      out.transport = mode;
-    }
-  }
   const diets = DIET_WORDS.flatMap((w) => transcript.match(new RegExp(`\\b${w}\\b`, "i"))?.[0].toLowerCase() ?? []);
-  if (diets.length) out.food = diets.join(", ");
+  if (diets.length) out.dietary = diets.join(", ");
+  const availability = cleanText(transcript.match(AVAIL_WORDS)?.[0]);
+  if (availability) out.availability = availability;
   const other = cleanText(transcript);
   if (other) out.other = other;
   return out;
@@ -131,9 +113,7 @@ export function fallbackParse(transcript: string): Partial<Preferences> {
 export function describePrefs(p: Partial<Preferences>): string {
   const parts: string[] = [];
   if (p.budget !== undefined && p.budget !== null) parts.push(`up to $${p.budget} per person`);
-  if (p.food) parts.push(`food: ${p.food}`);
-  if (p.transport) parts.push(`getting there by ${p.transport === "marta" ? "MARTA" : p.transport}`);
-  if (p.freeFrom || p.freeUntil) parts.push(`free ${p.freeFrom ? `from ${p.freeFrom}` : ""}${p.freeFrom && p.freeUntil ? " " : ""}${p.freeUntil ? `until ${p.freeUntil}` : ""}`);
-  if (p.hardNos) parts.push(`no: ${p.hardNos}`);
+  if (p.dietary) parts.push(`dietary: ${p.dietary}`);
+  if (p.availability) parts.push(`free ${p.availability}`);
   return parts.length ? `Heard: ${parts.join("; ")}.` : "Got it. I saved what you said as a note.";
 }

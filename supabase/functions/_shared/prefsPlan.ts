@@ -1,7 +1,8 @@
 // Plans from the members' private questionnaire answers (make-plan). Pure code, no Deno APIs.
 // Grok gets the answers anonymized ("Person 1"...), and the server re-checks every plan against the group's
-// hard rules: budget is a per-person cap, hard no's are exclusions, transport and the shared free window are
-// respected. Anything that fails is dropped. The same rules drive the no-Grok backup plans.
+// hard rules: budget is a per-person cap, and vegetarian/vegan answers require veg-friendly food.
+// Dietary details, availability, and other notes are passed through for Grok to honor. Anything that fails
+// a hard rule is dropped. The same rules drive the no-Grok backup plans.
 // Nothing stored on a plan names a member or reveals one person's budget or constraints.
 import type { CatalogItem } from "./logic.ts";
 import { normalizePrefs, type Preferences } from "./preferences.ts";
@@ -35,22 +36,13 @@ export const DAY = "Sat"; // no date on the questionnaire: plans are for the com
 
 const VEG = /\b(vegetarian|vegan|veggie|plant[- ]based)\b/i;
 
-const toMin = (hhmm: string | null) => {
-  if (!hhmm) return null;
-  const m = hhmm.match(/^(\d{2}):(\d{2})$/);
-  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-};
-
 /** Stored jsonb -> Preferences with every key present. */
 export function readPrefs(raw: unknown): Preferences {
   const p = normalizePrefs(raw);
   return {
     budget: p.budget ?? null,
-    food: p.food ?? "",
-    transport: p.transport ?? null,
-    freeFrom: p.freeFrom ?? null,
-    freeUntil: p.freeUntil ?? null,
-    hardNos: p.hardNos ?? "",
+    dietary: p.dietary ?? "",
+    availability: p.availability ?? "",
     other: p.other ?? "",
   };
 }
@@ -99,21 +91,15 @@ export function hitsHardNo(item: CatalogEntry, terms: string[]): boolean {
 // ------------------------------------------------------------------ needs + checks
 export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
   const budgets = all.flatMap((p) => (p.budget === null ? [] : [Math.round(p.budget * 100)]));
-  const froms = all.flatMap((p) => toMin(p.freeFrom) ?? []);
-  const untils = all.flatMap((p) => toMin(p.freeUntil) ?? []);
-  let windowFrom: number | null = froms.length ? Math.max(...froms) : null;
-  let windowUntil: number | null = untils.length ? Math.min(...untils) : null;
-  // No shared window: don't enforce times (Grok is told to find the best compromise).
-  if (windowFrom !== null && windowUntil !== null && windowUntil - windowFrom < 60) windowFrom = windowUntil = null;
   return {
     partySize: Math.max(1, partySize),
     capCents: budgets.length ? Math.min(...budgets) : null,
-    vegetarian: all.some((p) => VEG.test(p.food)),
-    transitOnly: all.some((p) => p.transport === "marta" || p.transport === "walk"),
-    windowFrom,
-    windowUntil,
-    hardNoTerms: [...new Set(all.flatMap((p) => hardNoTermsOf(p.hardNos)))],
-    anyTimes: froms.length + untils.length > 0,
+    vegetarian: all.some((p) => VEG.test(p.dietary)),
+    transitOnly: false,
+    windowFrom: null,
+    windowUntil: null,
+    hardNoTerms: [],
+    anyTimes: all.some((p) => p.availability.trim().length > 0),
   };
 }
 
@@ -225,14 +211,20 @@ Propose 2 or 3 meaningfully different plans for ${DAY}.
 HARD RULES (a plan that breaks one is thrown away):
 - Use ONLY catalog items, by exact "id". 1 to 4 items per plan.
 - The sum of price_per_person_cents of a plan's items must be <= group_rules.max_per_person_cents (when not null). Free items count.
-- Never include anything matching anyone's hard no's (group_rules.hard_no_terms and each person's hard_nos). Read them generously: "no heights" excludes rooftops and summits.
+- Never include anything matching anyone's hard no's (group_rules.hard_no_terms, usually written in "other"). Read them generously: "no heights" excludes rooftops and summits.
 - If group_rules.vegetarian_food_only, every food item must have veg_friendly = true.
 - If group_rules.transit_only, every item must have transit_friendly = true.
 - If group_rules.time_window is set, every item must start at or after "from" and end (start + duration_minutes) by "until". Respect typical_hours.
-SOFT: honor food cravings/allergies (dietary_note), "other" notes, and variety (e.g. a free/cheap plan, a food-focused one, something special).
+SOFT: honor each person's dietary text and availability in their own words, plus "other" notes, and variety (e.g. a free/cheap plan, a food-focused one, something special). Availability is not a hard clock window. A null budget, dietary, availability, or other means that person has no preference for it. Do not invent a limit or restriction for a null field.
 start_time format: "${DAY} 2:00 PM". Leave a little travel time between stops.
 PRIVACY (everyone in the group reads these plans): never mention any person, "Person N", a name, a dollar amount, or one person's constraint. why_it_fits is ONE short line about the group as a whole, e.g. "Under everyone's budget, vegetarian and gluten-free options, reachable by MARTA". Item notes describe the place, not people.
 Output only the JSON object required by the schema.`;
+
+/** Blank text is no preference, so Grok receives null instead of an empty string. */
+const prefText = (s: string) => {
+  const t = s.trim();
+  return t === "" ? null : t;
+};
 
 /** Anonymized Grok user message. Names never leave the server. */
 export function grokPayload(all: Preferences[], needs: GroupNeeds, catalog: CatalogEntry[]) {
@@ -242,12 +234,9 @@ export function grokPayload(all: Preferences[], needs: GroupNeeds, catalog: Cata
     people: all.map((p, i) => ({
       person: `Person ${i + 1}`,
       max_per_person_dollars: p.budget,
-      food: p.food,
-      getting_there: p.transport,
-      free_from: p.freeFrom,
-      free_until: p.freeUntil,
-      hard_nos: p.hardNos,
-      other: p.other,
+      dietary: prefText(p.dietary),
+      availability: prefText(p.availability),
+      other: prefText(p.other),
     })),
     group_rules: {
       max_per_person_cents: needs.capCents,
