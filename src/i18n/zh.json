@@ -7,6 +7,7 @@
   "common.theCreator": "创建者",
   "common.theCreatorStart": "创建者",
   "common.share": "分享",
+  "common.listSep": ", ",
   "status.planning": "等候室",
   "status.voting": "投票中",
   "status.decided": "已决定",

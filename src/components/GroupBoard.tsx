@@ -4,7 +4,8 @@
 // with real venue photos and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
 // breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useT } from "../i18n/hooks";
+import { iso } from "../i18n/bidi";
+import { useT, useTNodes } from "../i18n/hooks";
 import { buildFallbackPlans } from "../lib/fallback";
 import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
 import { isClosed } from "../lib/invite";
@@ -44,6 +45,7 @@ type Props = { groupId: string; page: Page; navigate: (path: string, opts?: Navi
 
 export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
   const t = useT();
+  const tNodes = useTNodes();
   const [savedNote, setSavedNote] = useState(false);
   const [group, setGroup] = useState<Group | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -261,7 +263,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
               <span className="inline-block rtl:-scale-x-100">←</span>
             </a>
             <div className="min-w-0 flex-1">
-              <a href={lobbyPath} onClick={toLobby} dir="auto" className="block truncate text-xs font-semibold text-navy">{t("answers.backTo", { group: group.name })}</a>
+              <a href={lobbyPath} onClick={toLobby} className="block break-words text-xs font-semibold text-navy">{tNodes("answers.backTo", { group: iso(group.name) })}</a>
               <h1 className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{t("lobby.yourAnswers")}</h1>
             </div>
           </header>
@@ -338,7 +340,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
             {tied.length > 0 && (
               <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
                 {t("board.tie")}{" "}
-                {me?.is_organizer ? t("board.tieCreator") : t("board.tieWaiting", { name: organizer?.display_name ?? t("common.theCreator") })}
+                {me?.is_organizer ? t("board.tieCreator") : tNodes("board.tieWaiting", { name: iso(organizer?.display_name ?? t("common.theCreator")) })}
               </p>
             )}
             {plans.map((p) => (

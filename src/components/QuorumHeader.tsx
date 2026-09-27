@@ -1,10 +1,11 @@
 // Shared top util nav: language (PR #15 LanguageMenu), in-app group notifications, and How-it-works info.
 // Used on CreateGroup (home) and GroupBoard so every screen keeps Joc's spring/navy chrome.
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { LanguageMenu } from "./LanguageSwitcher";
 import { useLanguagePicker } from "../i18n/useLanguagePicker";
-import { useT } from "../i18n/hooks";
-import { useGroupNotifications, type GroupNotification, type NotifKind } from "../lib/useGroupNotifications";
+import { iso } from "../i18n/bidi";
+import { useT, useTNodes } from "../i18n/hooks";
+import { useGroupNotifications, type GroupNotification } from "../lib/useGroupNotifications";
 
 const utilBtn =
   "inline-flex h-8 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
@@ -40,17 +41,19 @@ function InfoIcon({ className = "h-4 w-4" }: { className?: string }) {
   );
 }
 
-function notifText(t: (k: string, v?: Record<string, string | number>) => string, n: GroupNotification): string {
-  const name = n.name ?? "";
-  const map: Record<NotifKind, string> = {
-    joined: t("notif.joined", { name }),
-    ready: t("notif.ready", { name }),
-    allReady: t("notif.allReady"),
-    plansReady: t("notif.plansReady"),
-    voted: t("notif.voted", { name }),
-    winner: t("notif.winner", { name: name || t("notif.thePlan") }),
-  };
-  return map[n.kind];
+type TNodes = (k: string, v?: Record<string, ReactNode>) => ReactNode;
+
+/** Names (and the winning plan's title) are <bdi>-isolated so they can't reorder the sentence in Arabic. */
+function notifText(t: (k: string) => string, tNodes: TNodes, n: GroupNotification): ReactNode {
+  const name = iso(n.name ?? "");
+  switch (n.kind) {
+    case "joined": return tNodes("notif.joined", { name });
+    case "ready": return tNodes("notif.ready", { name });
+    case "allReady": return t("notif.allReady");
+    case "plansReady": return t("notif.plansReady");
+    case "voted": return tNodes("notif.voted", { name });
+    case "winner": return tNodes("notif.winner", { name: n.name ? name : t("notif.thePlan") });
+  }
 }
 
 type Tone = "onSpring" | "onLight";
@@ -67,6 +70,7 @@ type Props = {
 
 export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = false, className = "" }: Props) {
   const t = useT();
+  const tNodes = useTNodes();
   const { shortCode, label: langLabel } = useLanguagePicker();
   const { items, unread, markRead, empty, isUnread } = useGroupNotifications(groupId);
   const [bellOpen, setBellOpen] = useState(false);
@@ -161,7 +165,7 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
                         key={n.key}
                         className={`border-b border-navy/5 px-3 py-2.5 text-sm last:border-0 ${isUnread(n.key) ? "bg-spring/15" : ""}`}
                       >
-                        <p className="leading-snug text-navy">{notifText(t, n)}</p>
+                        <p className="leading-snug text-navy">{notifText(t, tNodes, n)}</p>
                       </li>
                     ))}
                   </ul>
