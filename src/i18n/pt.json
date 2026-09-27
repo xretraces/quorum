@@ -186,6 +186,7 @@
   "final.share": "📤 Compartilhar",
   "final.pricesNote": "Os preços são estimativas do catálogo.",
   "final.copied": "Copiado",
+  "final.linkCopied": "Link copiado",
   "final.shareFailed": "Não deu pra compartilhar neste navegador",
   "final.shareAbout": "Cerca de {price} por pessoa",
   "final.stopN": "Parada {n}",

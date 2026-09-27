@@ -186,6 +186,7 @@
   "final.share": "📤 शेयर करें",
   "final.pricesNote": "कीमतें कैटलॉग के अनुमान हैं।",
   "final.copied": "क्लिपबोर्ड पर कॉपी हो गया",
+  "final.linkCopied": "लिंक कॉपी हो गया",
   "final.shareFailed": "इस ब्राउज़र पर शेयर नहीं हो पाया",
   "final.shareAbout": "करीब {price} प्रति व्यक्ति",
   "final.stopN": "पड़ाव {n}",

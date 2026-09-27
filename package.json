@@ -7,7 +7,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --test src/lib/voice-logic.test.ts src/lib/voiceFill.test.ts src/lib/venuePhotos.test.ts supabase/functions/_shared/requests.test.ts"
+    "test": "node --experimental-strip-types --test src/lib/voice-logic.test.ts src/lib/voiceFill.test.ts src/lib/venuePhotos.test.ts supabase/functions/_shared/requests.test.ts supabase/functions/_shared/budget.test.ts"
   },
   "dependencies": {
     "@stripe/react-stripe-js": "^3.1.1",

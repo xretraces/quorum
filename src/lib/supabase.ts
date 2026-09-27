@@ -81,6 +81,7 @@ export type Member = {
   id: string; group_id: string; display_name: string; is_organizer: boolean; budget_cap_cents: number | null;
   cap_source: string; dietary: string | null; availability: string | null; transport: string | null;
   vote_plan_id: string | null; approved: boolean; prefs_ready?: boolean; approved_amount_cents: number | null;
+  created_at?: string;
   constraints: Record<string, unknown> & { rejection?: Rejection; sim_payment?: SimPayment };
 };
 /**

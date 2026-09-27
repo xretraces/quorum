@@ -186,6 +186,7 @@
   "final.share": "📤 Partager",
   "final.pricesNote": "Les prix sont des estimations du catalogue.",
   "final.copied": "Copié dans le presse-papiers",
+  "final.linkCopied": "Lien copié",
   "final.shareFailed": "Impossible de partager sur ce navigateur",
   "final.shareAbout": "Environ {price} par personne",
   "final.stopN": "Étape {n}",

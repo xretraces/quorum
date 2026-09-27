@@ -12,9 +12,13 @@
 // request; group: each request in at least one plan), unless a request conflicts with a hard rule. Grok only sees
 // catalog items that pass the hard rules on their own, shuffled per call, and backup plans break ties randomly, so
 // the same answers don't always produce the same three plans.
+// Budget is hard: right before saving, enforceBudget() recomputes every plan's per-person cost from catalog prices and
+// drops any plan over the LOWEST budget in the group (Grok's list is then topped up from backup plans, which pass the
+// same cap). Logs only say how many were dropped, never whose cap it was.
 // Nothing written or returned names a member or reveals one person's answers.
 // Secrets: GROK_API_KEY (or XAI_API_KEY), optional GROK_MODEL.
 
+import { enforceBudget } from "../_shared/budget.ts";
 import { CATALOG_FILE } from "../_shared/catalog.ts";
 import { adminClient } from "../_shared/db.ts";
 import { HttpError, reqString, serveJson } from "../_shared/http.ts";
@@ -45,6 +49,20 @@ const GROK_FIRST_ATTEMPT_MS = 75_000;
 const GROK_BUDGET_MS = 110_000; // total across both attempts; leaves room under the 150s wall-clock limit
 const GROK_MIN_RETRY_MS = 5_000; // skip the retry if less than this is left
 const catalog = CATALOG_FILE.activities as unknown as CatalogEntry[];
+const catalogPrice = new Map(catalog.map((c) => [c.id, c.price_per_person_cents]));
+const priceOf = (id: string) => catalogPrice.get(id);
+
+/** Hard budget check on the final list; tops a short list up with backup plans (which pass the cap) that add new stops. */
+function withinBudget(plans: PlanRow[], needs: GroupNeeds): PlanRow[] {
+  const checked = enforceBudget(plans, needs.capCents, priceOf, needs.partySize);
+  if (checked.dropped) console.warn(`make-plan: dropped ${checked.dropped} plan(s) over the group budget`); // no names
+  const out = checked.plans;
+  if (out.length >= 3) return out;
+  const used = new Set(out.flatMap((p) => p.items.map((i) => i.catalog_id)));
+  const extra = enforceBudget(backupPlans(catalog, needs, Math.random).plans, needs.capCents, priceOf, needs.partySize).plans
+    .filter((p) => !p.items.some((i) => used.has(i.catalog_id)));
+  return [...out, ...extra].slice(0, 3).map((p, i) => ({ ...p, option_index: i }));
+}
 
 async function callGrok(userPayload: unknown, ids: string[], model: string, apiKey: string): Promise<GrokPlan[]> {
   const requestSchema = schemaForRequest(PREFS_PLAN_SCHEMA as unknown as Record<string, unknown>, ids);
@@ -148,7 +166,7 @@ Deno.serve(serveJson(async (body) => {
   const names = roster.map((m) => m.display_name);
   const fromGrok = await planWithGrok(all, needs, names);
   const backup = fromGrok ? null : backupPlans(catalog, needs, Math.random);
-  const plans: PlanRow[] = fromGrok?.plans ?? backup!.plans;
+  const plans: PlanRow[] = withinBudget(fromGrok?.plans ?? backup!.plans, needs);
   const notice = backup?.notice ?? null;
   const model = fromGrok?.model ?? "backup";
   if (plans.length === 0) {

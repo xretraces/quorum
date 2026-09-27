@@ -4,6 +4,9 @@
 // (make-plan reads everyone's private answers server-side) with the shared "Grok is working" steps -> plan cards
 // with real venue photos and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
 // breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
+// Plans go stale when someone joins after they were made, or anyone saves answers while they're up (before a winner):
+// the saving phone clears them (clearPlans) and, once everyone currently in the group is ready, reruns make-plan with
+// all members' answers, so old solo plans are never shown as the group's final options.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { iso } from "../i18n/bidi";
 import { useT, useTNodes } from "../i18n/hooks";
@@ -35,6 +38,13 @@ function tally(plans: Plan[], members: Member[]) {
   const max = Math.max(0, ...counts.values());
   const leaders = plans.filter((p) => counts.get(p.id) === max);
   return { voted, allVoted, winner: allVoted && leaders.length === 1 ? leaders[0] : null, tied: allVoted && leaders.length > 1 ? leaders : [] };
+}
+
+/** True when someone joined after the current plans were made: their answers aren't in them yet. */
+function plansAreStale(plans: Plan[], members: Member[]): boolean {
+  const made = Math.min(...plans.map((p) => (p.created_at ? Date.parse(p.created_at) : Infinity)));
+  if (!plans.length || !Number.isFinite(made)) return false;
+  return members.some((m) => m.created_at && Date.parse(m.created_at) > made);
 }
 
 /** i18n keys of the plan's badges. */
@@ -102,7 +112,8 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
 
   const winner = plans.find((p) => p.id === group?.selected_plan_id) ?? null;
   const { voted, winner: leading, tied } = tally(plans, members);
-  const stage = grokRun ? "grok" : winner ? "final" : plans.length ? "vote" : "lobby";
+  const stale = !winner && plansAreStale(plans, members);
+  const stage = grokRun ? "grok" : winner ? "final" : plans.length && !stale ? "vote" : "lobby";
   const allReady = members.length > 0 && members.every((m) => m.prefs_ready);
 
   const lobbyPath = `/g/${groupId}`;
@@ -114,12 +125,14 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
   }, [navigate, lobbyPath]);
 
   // The answers page is only for members while the group is still collecting answers: non-members go to the join page
-  // (or the board if the group is closed), and once Grok is working or plans exist everyone is sent to the board.
+  // (or the board if the group is closed). Answers stay editable while voting (saving then remakes the plans); once
+  // Quorum is working or a plan has won, everyone is sent to the board.
+  const canAnswer = stage === "lobby" || stage === "vote";
   useEffect(() => {
     if (page !== "answers" || !group) return;
     if (!me) navigate(isClosed(group) ? lobbyPath : `/join/${group.invite_code}`, { replace: true });
-    else if (stage !== "lobby") navigate(lobbyPath, { replace: true });
-  }, [page, group, me, stage, navigate, lobbyPath]);
+    else if (!canAnswer) navigate(lobbyPath, { replace: true });
+  }, [page, group, me, canAnswer, navigate, lobbyPath]);
 
   useEffect(() => {
     if (!savedNote) return;
@@ -213,6 +226,20 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
     }
   }
 
+  /**
+   * New or changed answers make the current plans stale: drop them (and the votes) so no phone keeps showing plans
+   * that ignore someone's answers. Never after a plan has won.
+   */
+  async function clearPlans() {
+    if (!plans.length || group?.selected_plan_id) return;
+    const r = await supabase.from("members").update({ vote_plan_id: null }).eq("group_id", groupId);
+    if (r.error) throw r.error;
+    const d = await supabase.from("plans").delete().eq("group_id", groupId);
+    if (d.error) throw d.error;
+    const g = await supabase.from("groups").update({ status: "planning" }).eq("id", groupId).is("selected_plan_id", null);
+    if (g.error) throw g.error;
+  }
+
   async function applyFallback(): Promise<Plan[]> {
     const g = await supabase.from("groups").update({ status: "voting", selected_plan_id: null, recap_image_url: null }).eq("id", groupId);
     if (g.error) throw g.error;
@@ -276,7 +303,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
           </a>
         </div>
         <main className="relative z-10 mx-auto w-full max-w-[40rem] px-5 pb-16 pt-4 sm:px-8">
-          {me && stage === "lobby" ? (
+          {me && canAnswer ? (
             <Questionnaire
               memberId={me.id}
               intro={
@@ -291,11 +318,16 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
                   <p className="mt-4 text-sm font-medium text-navy/80">{t("q.private")}</p>
                 </header>
               }
-              onSaved={() => {
+              onSaved={async () => {
                 autoPlan.current = true;
                 setInviting(false);
                 setSavedNote(true);
-                void load();
+                try {
+                  await clearPlans(); // plans made before these answers are stale; remade once everyone is ready
+                } catch (e) {
+                  setErr(e instanceof Error ? e.message : String(e));
+                }
+                await load();
                 backToLobby();
               }}
             />
@@ -339,7 +371,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
           <Waiting members={members} me={me} busy={!!busy} saved={savedNote} onMakePlans={askGrok} onOpenAnswers={openAnswers} onInvite={() => setInviting(true)} />
         )}
 
-        {stage === "lobby" && (!me?.prefs_ready || inviting) && (
+        {((stage === "lobby" && (!me?.prefs_ready || inviting)) || (stage === "vote" && inviting)) && (
           <>
             {inviting && (
               <div className="mx-auto mb-6 w-full max-w-3xl">
@@ -358,7 +390,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
           </div>
         )}
 
-        {stage === "vote" && (
+        {stage === "vote" && !inviting && (
           <section className="space-y-8">
             <div>
               <h2 className="font-logo text-3xl font-bold tracking-tight text-navy sm:text-4xl">{t("board.whichPlan")}</h2>
@@ -388,15 +420,27 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
                 />
               ))}
             </div>
-            {me?.is_organizer && (
-              <button
-                disabled={!!busy}
-                onClick={askGrok}
-                className="q-btn q-btn-secondary text-sm"
-              >
-                {t("board.askAgain")}
-              </button>
-            )}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {me?.is_organizer && (
+                <button
+                  disabled={!!busy}
+                  onClick={askGrok}
+                  className="q-btn q-btn-secondary text-sm"
+                >
+                  {t("board.askAgain")}
+                </button>
+              )}
+              {me && (
+                <button onClick={openAnswers} className="inline-flex min-h-10 items-center text-sm font-semibold text-navy underline underline-offset-4">
+                  {t("lobby.editAnswers")}
+                </button>
+              )}
+              {me && !isClosed(group) && (
+                <button onClick={() => setInviting(true)} className="inline-flex min-h-10 items-center text-sm font-semibold text-navy underline underline-offset-4">
+                  {t("waiting.inviteMore")}
+                </button>
+              )}
+            </div>
           </section>
         )}
 

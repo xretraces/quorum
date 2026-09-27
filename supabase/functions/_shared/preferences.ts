@@ -1,5 +1,6 @@
 // Questionnaire preferences parsed from a spoken transcript (parse-prefs). Pure code, no Deno APIs, so the
 // web app can import the type too. The form is four fields: budget, dietary, availability, other.
+import { parseBudget } from "./budget.ts";
 
 export type Preferences = {
   budget: number | null; // max $ per person
@@ -98,10 +99,9 @@ export function normalizePrefs(raw: unknown): Partial<Preferences> {
   const r = raw as Record<string, unknown>;
   const out: Partial<Preferences> = {};
 
-  const budget = typeof r.budget === "string" ? Number(r.budget.replace(/[$,\s]/g, "")) : r.budget;
-  if (typeof budget === "number" && Number.isFinite(budget)) {
-    out.budget = Math.round(Math.min(MAX_BUDGET, Math.max(0, budget)));
-  }
+  // Text like "under $25" or "$20-30" counts too, so a budget saved as words is never silently dropped.
+  const budget = parseBudget(r.budget);
+  if (budget !== null) out.budget = budget;
   const dietary = cleanText(r.dietary) ?? cleanText(r.food);
   if (dietary) out.dietary = dietary;
   const availability = cleanText(r.availability) ?? legacyAvailability(r);
@@ -121,8 +121,10 @@ const AVAIL_WORDS = /\b(?:free|available|after|until|before|tonight|tomorrow|thi
 /** Cheap no-LLM parse used when Grok is unavailable. The whole transcript goes into `other`. */
 export function fallbackParse(transcript: string): Partial<Preferences> {
   const out: Partial<Preferences> = {};
-  const money = transcript.match(/\$\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*(?:dollars|bucks)\b/i);
-  if (money) out.budget = Math.round(Math.min(MAX_BUDGET, Number(money[1] ?? money[2])));
+  const money = transcript.match(
+    /\$\s*(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)\s*(?:dollars|bucks)\b|\b(?:under|below|less than|max(?:imum)?|up to|at most|no more than)\s+(\d+(?:\.\d+)?)\b/i,
+  );
+  if (money) out.budget = Math.round(Math.min(MAX_BUDGET, Number(money[1] ?? money[2] ?? money[3])));
 
   const diets = DIET_WORDS.flatMap((w) => transcript.match(new RegExp(`\\b${w}\\b`, "i"))?.[0].toLowerCase() ?? []);
   if (diets.length) out.dietary = diets.join(", ");

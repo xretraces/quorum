@@ -186,6 +186,7 @@
   "final.share": "📤 分享",
   "final.pricesNote": "价格为目录中的估算。",
   "final.copied": "已复制到剪贴板",
+  "final.linkCopied": "链接已复制",
   "final.shareFailed": "此浏览器无法分享",
   "final.shareAbout": "约每人 {price}",
   "final.stopN": "第 {n} 站",
