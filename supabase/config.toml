@@ -10,3 +10,6 @@ verify_jwt = false
 
 [functions.recap-image]
 verify_jwt = false
+
+[functions.parse-prefs]
+verify_jwt = false
