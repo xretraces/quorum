@@ -6,7 +6,7 @@ import { localStart } from "../i18n/format";
 import { isoList } from "../i18n/bidi";
 import { useLanguage, useT, useTNodes } from "../i18n/hooks";
 import { usePlanTranslation } from "../i18n/usePlanTranslation";
-import { DemoPlanPill, GrokSays } from "./Grok";
+import { DemoPlanPill, QuorumSays } from "./Grok";
 import { VenuePhotos } from "./VenuePhotos";
 
 type Props = {
@@ -63,9 +63,9 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
       </ol>
 
       {plan.why_it_works && (
-        <GrokSays label={t("plan.whyItFits")} tag={notGrok && <DemoPlanPill backup={plan.model === "backup"} />}>
+        <QuorumSays label={t("plan.whyItFits")} tag={notGrok && <DemoPlanPill backup={plan.model === "backup"} />}>
           <bdi className={shimmer}>{plan.why_it_works}</bdi>
-        </GrokSays>
+        </QuorumSays>
       )}
 
       <div className="flex flex-wrap items-center gap-3">

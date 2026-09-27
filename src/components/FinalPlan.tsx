@@ -8,7 +8,7 @@ import { useLanguage, useT } from "../i18n/hooks";
 import { usePlanTranslation } from "../i18n/usePlanTranslation";
 import { downloadIcs } from "../lib/calendar";
 import { type Group, type Member, type Plan, usd } from "../lib/supabase";
-import { GrokSays } from "./Grok";
+import { QuorumSays } from "./Grok";
 import { Recap } from "./Recap";
 import { FinalPhotos } from "./VenuePhotos";
 
@@ -121,9 +121,9 @@ export function FinalPlan({ group, plan: original, members, painting, onMakePost
           </ol>
 
           {plan.why_it_works && (
-            <GrokSays label={t("plan.whyItFits")} className="mt-1">
+            <QuorumSays label={t("plan.whyItFits")} className="mt-1">
               <bdi className={shimmer}>{plan.why_it_works}</bdi>
-            </GrokSays>
+            </QuorumSays>
           )}
 
           <div className="mt-6 flex flex-wrap gap-2">

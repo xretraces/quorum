@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { iso } from "../i18n/bidi";
 import { useT, useTNodes } from "../i18n/hooks";
 import type { GrokRun } from "../lib/grokRun";
-import { DemoPlanPill, GrokAvatar, GrokSays } from "./Grok";
+import { DemoPlanPill, QuorumMark, QuorumSays } from "./Grok";
 
 // i18n keys (src/i18n/en.json): the step list and Grok's matching "is doing X…" line.
 const STEPS = ["working.step0", "working.step1", "working.step2", "working.step3", "working.step4"];
@@ -58,8 +58,8 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
   return (
     <section ref={ref} aria-live="polite" className="mx-auto w-full max-w-xl text-center">
       <p className="inline-flex items-center gap-2 text-sm font-semibold text-navy/70">
-        <GrokAvatar size={22} />
-        <b className="font-logo font-bold text-navy">Grok</b>
+        <QuorumMark size={22} />
+        <b className="font-logo font-bold text-navy">Quorum</b>
         <span aria-hidden>·</span>
         <span>{t("working.subtitle")}</span>
       </p>
@@ -68,7 +68,7 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
           <span>{t(demo ? (backup ? "working.readyBackup" : "working.readyDemo") : "working.readyGrok")}</span>
         ) : (
           <span key={doneCount} className="shimmer-text">
-            {tNodes(SAYS[Math.min(doneCount, SAYS.length - 1)], { grok: <b>Grok</b> })}
+            {tNodes(SAYS[Math.min(doneCount, SAYS.length - 1)], { grok: <b>Quorum</b> })}
           </span>
         )}
       </p>
@@ -119,13 +119,13 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
       )}
       {allDone && (
         <div className="mx-auto mt-4 w-fit text-start">
-          <GrokSays tag={demo && <DemoPlanPill backup={backup} />}>
+          <QuorumSays tag={demo && <DemoPlanPill backup={backup} />}>
             {backup
               ? t("working.doneBackup")
               : demo
                 ? t("working.doneDemo")
                 : t("working.doneGrok")}
-          </GrokSays>
+          </QuorumSays>
         </div>
       )}
     </section>
