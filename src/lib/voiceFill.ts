@@ -12,7 +12,7 @@ export function voiceFillPatch(current: Preferences, parsed: Partial<Preferences
   const extra = parsed.other?.trim();
   if (extra) {
     const had = current.other.trim();
-    out.other = !had ? extra : had.toLowerCase().includes(extra.toLowerCase()) ? had : `${had.replace(/[.;,\s]+$/, "")}. ${extra}`;
+    out.other = !had ? extra : had.toLowerCase().includes(extra.toLowerCase()) ? had : `${had.replace(/[.;,\s]+$/, "")}. ${extra}`.slice(0, 1500); // form maxLength
   }
   return out;
 }

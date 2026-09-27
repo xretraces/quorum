@@ -185,10 +185,14 @@ export async function recordAudio(opts: VoiceCaptureOpts): Promise<{ blob: Blob;
   }
 }
 
+// `invoke`'s name union lives in supabase.ts, which other open branches also extend; widen it here instead
+// so this branch doesn't touch that line.
+const invokeFn = invoke as unknown as <T>(fn: "transcribe", body: unknown) => Promise<T>;
+
 export async function transcribeWithGrok(blob: Blob, mime: string, extraKeyterms: string[] = []): Promise<TranscribeResponse> {
   const audio_base64 = await blobToBase64(blob);
   const mimeType = mime.split(";")[0] || RECORDER_MIME_CANDIDATES[0];
-  return invoke<TranscribeResponse>("transcribe", {
+  return invokeFn<TranscribeResponse>("transcribe", {
     audio_base64,
     mime_type: mimeType,
     keyterms: extraKeyterms.filter(Boolean).slice(0, 20),
