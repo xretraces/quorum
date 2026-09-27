@@ -4,13 +4,15 @@
 
 Live: https://quorum-eight-mu.vercel.app · Built at HackGT 13.
 
-The creator makes a group and shows a big **QR code** (or copies/shares the link). Friends scan it and join with just a name; the lobby shows them appearing live. Each person fills a short **private questionnaire** with four fields: **Budget** (max $ per person), **Dietary**, **Availability** and **Other**. A blank field means "no preference". Instead of typing into each field, they can **tell Grok about themselves** in one sentence, spoken (🎙 Speak, transcribed by **Grok Voice**) or typed, and Grok fills the four fields for them to check and edit. **Only Grok sees the answers**; everyone else just sees a ✓ Ready checkmark. When everyone is ready (or at least 2 people are and the creator taps "Plan it anyway"), the creator taps **Ask Grok**. The `make-plan` function reads the answers server-side and returns 2-3 real Atlanta plans. Budget is a hard per-person cap, hard no's are strict exclusions, and vegetarian or gluten-free answers mean only suitable food stops; the server re-checks all of them. Each card shows **pictures of the venues** (freely licensed photos, or a Grok Imagine picture where no real photo of the place exists), a group-level "why it fits" line that never names anyone, and labels like "Fits everyone" / "Cheapest". Everyone taps **I'm in** on one plan. Once everyone has voted, the top plan wins (the creator breaks ties) and every phone switches live to **Your plan**, with a **Grok Imagine** poster, **Add to calendar** (.ics download) and Share.
+The creator makes a group and shows a big **QR code** (or copies/shares the link). Friends scan it and join with just a name; the lobby shows them appearing live. Each person fills a short **private questionnaire** with four fields: **Budget** (max $ per person), **Dietary**, **Availability** and **Other**. A blank field means "no preference". Instead of typing into each field, they can **tell Grok about themselves** in one sentence, spoken (🎙 Speak, transcribed by **Grok Voice**) or typed, and Grok fills the four fields for them to check and edit. **Only Grok sees the answers**; everyone else just sees a ✓ Ready checkmark. When everyone is ready (or at least 2 people are and the creator taps "Plan it anyway"), the creator taps **Ask Grok**. The `make-plan` function reads the answers server-side and returns 2-3 real Atlanta plans. Budget is a hard per-person cap, hard no's are strict exclusions, and vegetarian or gluten-free answers mean only suitable food stops; the server re-checks all of them. Each card shows **pictures of the venues** (freely licensed photos, or a Grok Imagine picture where no real photo of the place exists), a group-level "why it fits" line that never names anyone, and labels like "Fits everyone" / "Cheapest". Everyone taps **I'm in** on one plan. Once everyone has voted, the top plan wins (the creator breaks ties) and every phone switches live to **Your plan**, with a **Grok Imagine** poster, **Add to calendar** (.ics download) and Share. Each person can pick their own **language** from the switcher in the corner (9 languages, including right-to-left Arabic); the UI changes instantly and Grok translates the plans for them.
+
+**Shipped and live:** Tell Grok about yourself (speak via Grok Voice or type; Grok fills the form), gluten-free as a real plan check, and the language switcher with Grok-translated plans (9 languages, including right-to-left Arabic).
 
 ## Built with Grok
 
 | Grok product | Where it's used |
 | --- | --- |
-| **Grok models** (xAI API, strict JSON-schema output) | Plans: `make-plan` turns everyone's anonymized answers into 2-3 plans. Parsing: `parse-prefs` turns a spoken or typed sentence into the four questionnaire fields. Translation: the language switcher (in progress, open PR on `feat/i18n`) |
+| **Grok models** (xAI API, strict JSON-schema output) | Plans: `make-plan` turns everyone's anonymized answers into 2-3 plans. Parsing: `parse-prefs` turns a spoken or typed sentence into the four questionnaire fields. Translation: `translate-plan` translates each plan's text for the language switcher (cached per plan and language); the UI strings in 8 languages were also pre-translated by Grok (`scripts/translate-i18n.mjs`) |
 | **Grok Imagine** | The winning plan's poster (`recap-image`), plus 6 pre-generated venue pictures for places without a usable real photo (`photoCredit.license = "AI-generated"` in `data/atlanta-activities.json`) |
 | **Grok Voice** | Spoken answers for the questionnaire: the "Tell Grok about yourself" box records a short voice note, the `transcribe` function sends it to Grok Voice speech-to-text (`grok-voice-transcribe-2.0`, xAI `/v1/stt`), then `parse-prefs` fills the form |
 
@@ -19,7 +21,7 @@ Built with **Cursor** and **Claude Code**.
 ## Stack
 
 - **Web:** React 19 + Vite + TypeScript + Tailwind v4 at the repo root (`src/`), `@supabase/supabase-js`, `qrcode.react`
-- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `parse-prefs`, `transcribe`, `recap-image`
+- **Backend:** Supabase Postgres + Realtime + Edge Functions (Deno): `make-plan`, `parse-prefs`, `transcribe`, `recap-image`, `translate-plan`
 - **AI:** xAI Grok models (strict JSON-schema output), Grok Voice (speech-to-text) and Grok Imagine
 - **Hosting:** Vercel (web; `vercel.json` has the SPA rewrite) + Supabase (functions)
 
@@ -41,7 +43,9 @@ Create a group, then open the invite link (or enter the invite code on the home 
 ```
 src/                     React app
   components/            CreateGroup (home: create + join by code), YourGroups, JoinGroup, GroupBoard, Lobby,
-                         Questionnaire, VoiceFill, VoiceButton, GrokWorking, PlanCard, VenuePhotos, FinalPlan, Recap
+                         Questionnaire, VoiceFill, VoiceButton, GrokWorking, PlanCard, VenuePhotos, FinalPlan, Recap,
+                         LanguageSwitcher
+  i18n/                  en.json (source of truth) + 8 translated JSON files, LanguageProvider, useT(), usePlanTranslation
   lib/supabase.ts        client, invoke() helper, types, localStorage identity helpers
   lib/prefs.ts           private answers: claim_member / save_my_prefs / get_my_prefs RPCs
   lib/parsePrefs.ts      client for the parse-prefs function
@@ -51,7 +55,7 @@ src/                     React app
   lib/calendar.ts        .ics export for the winning plan
   lib/fallback.ts        saved demo plans, used only if the make-plan call fails
 supabase/
-  functions/             make-plan, parse-prefs, transcribe, recap-image + _shared (plan rules, preferences, stt, generated catalog)
+  functions/             make-plan, parse-prefs, transcribe, recap-image, translate-plan + _shared (plan rules, preferences, stt, generated catalog)
   migrations/            schema + private answers (see Database)
   config.toml            verify_jwt = false for every function
 data/                    atlanta-activities.json (venue catalog; prices are approximate demo data, gf_friendly notes, photo credits)
@@ -64,11 +68,11 @@ docs/TEAM_SPEC.md        original product spec (screens/flow/UX; ignore its Expr
 
 ## Database
 
-Project ref **`oavxpwpdhdazhtieikju`**. All migrations in `supabase/migrations/` are **already applied** to the live database, including `20260927000001_private_prefs.sql` (private `member_prefs` + RPCs, `members.prefs_ready`, `plans.recap_image_url`, `groups.status` value `decided`). The files are here for reference and for fresh projects.
+Project ref **`oavxpwpdhdazhtieikju`**. All migrations in `supabase/migrations/` are **already applied** to the live database, including `20260927000001_private_prefs.sql` (private `member_prefs` + RPCs, `members.prefs_ready`, `plans.recap_image_url`, `groups.status` value `decided`) and `20260927000002_plan_translations.sql` (`plans.translations`). The files are here for reference and for fresh projects.
 
 - `groups`: name, `invite_code`, `status` (`planning` → `voting` → `decided`), `selected_plan_id`, `recap_image_url`.
 - `members`: `display_name`, `is_organizer`, `prefs_ready` (the public ✓), `vote_plan_id`.
-- `plans`: 2-3 per group from `make-plan` (items, per-person and total price, `why_it_works`, `model`).
+- `plans`: 2-3 per group from `make-plan` (items, per-person and total price, `why_it_works`, `model`), plus `translations` (Grok's cached translations of the plan text, keyed by language).
 - `member_prefs`: each person's private answers (see Privacy).
 
 `groups`, `members` and `plans` have permissive demo RLS and Realtime on, so every phone updates live.
@@ -87,6 +91,7 @@ Project ref **`oavxpwpdhdazhtieikju`**. All migrations in `supabase/migrations/`
 | Vote, live counts, winner, tie-break | `PlanCard.tsx`, `tally()` in `GroupBoard.tsx` (`members.vote_plan_id`, `groups.selected_plan_id`, status `decided`) |
 | Grok Imagine poster for the winning plan | `Recap.tsx` on the final screen; the creator's phone calls `recap-image { group_id }` once the vote is decided |
 | Your plan, Add to calendar, Share | `FinalPlan.tsx`, `lib/calendar.ts` (.ics) |
+| Language switcher (9 languages, Arabic RTL) + translated plans | `LanguageSwitcher.tsx`, `src/i18n/` (`useT()`, `usePlanTranslation` → `translate-plan`, cached in `plans.translations`) |
 | Grok down | `make-plan` builds "Backup plan"s from the same answers. If `make-plan` itself can't be reached: saved "Demo plan"s (`lib/fallback.ts`, not checked against answers because the browser can't read them) |
 
 ### Privacy of answers
@@ -132,6 +137,7 @@ npx supabase functions deploy make-plan   --no-verify-jwt
 npx supabase functions deploy parse-prefs --no-verify-jwt
 npx supabase functions deploy transcribe  --no-verify-jwt
 npx supabase functions deploy recap-image --no-verify-jwt
+npx supabase functions deploy translate-plan --no-verify-jwt
 # No Docker? add --use-api
 ```
 
@@ -162,7 +168,7 @@ Import the repo → framework **Vite** → add `VITE_SUPABASE_URL` and `VITE_SUP
 
 **0:20, QR lobby.** The creator makes "Saturday hang" and the lobby shows a big QR code. Two judges scan it with their phone camera, no app needed, join with just a name, and pop up in the member list live.
 
-**0:40, private answers.** Each phone fills the four fields: Budget, Dietary, Availability, Other (blank = no preference). For example: "$35, vegetarian, no car" · "$80, free after 5 PM Saturday, I have a car" · "$40, gluten-free, I take MARTA". One judge taps **🎙 Speak** in the "Tell Grok about yourself" box and says it instead (or types it): Grok Voice transcribes it and Grok fills the four fields, marked "Filled by Grok — check and edit". Point out the 🔒 "Only Grok sees this" note: everyone else only sees a ✓ Ready checkmark.
+**0:40, private answers.** Each phone fills the four fields: Budget, Dietary, Availability, Other (blank = no preference). For example: "$35, vegetarian, no car" · "$80, free after 5 PM Saturday, I have a car" · "$40, gluten-free, I take MARTA". One judge taps **🎙 Speak** in the "Tell Grok about yourself" box and says it instead (or types it): Grok Voice transcribes it and Grok fills the four fields, marked "Filled by Grok — check and edit". Point out the 🔒 "Only Grok sees this" note: everyone else only sees a ✓ Ready checkmark. Have one judge switch their phone to Español or العربية from the language switcher: the whole UI flips (Arabic right-to-left), and later their plans arrive translated by Grok.
 
 **1:05, Grok plans.** The creator taps **Ask Grok**. Every phone shows the "Grok is working" card. 20-90 s later, 2-3 real Atlanta plans appear with venue pictures and a "why it fits" line that names nobody. Point out that every plan is under the lowest budget (the server re-checks Grok's math against the catalog prices), uses veg-friendly food, only picks food stops with gluten-free options, and only uses places reachable by MARTA, and that nothing reveals whose constraint was whose.
 
@@ -175,3 +181,22 @@ Import the repo → framework **Vite** → add `VITE_SUPABASE_URL` and `VITE_SUP
 ## Security notes (demo)
 
 RLS is permissive on `groups`, `members` and `plans` so the demo works without login (see the header of `supabase/migrations/20260926000001_schema.sql`); private answers are locked down as described above. The publishable key and Supabase URL are public by design. Never commit `xai-` or service-role keys. Before real use: add Supabase Auth, tie members to `auth.uid()` and tighten policies.
+
+## Languages (i18n)
+
+**Shipped.** A language switcher (`src/components/LanguageSwitcher.tsx`, top-right of every screen; top-left in Arabic) translates the whole UI instantly into 9 languages:
+English, Español, Français, Deutsch, Português, 中文, 한국어, हिन्दी, العربية. Arabic switches `<html dir="rtl">` and the layout mirrors
+(logical `text-start`/`ms-*`/`end-*` classes, `dir="auto"` / `<bdi>` around Latin group and venue names).
+
+- **Static UI strings** live in `src/i18n/en.json` (source of truth). `useT()` returns `t(key, vars)` with `{name}`
+  placeholders and `_one`/`_other` plurals; `useLanguage()` gives `{ lang, setLang, dir }`. The choice is kept in
+  localStorage (default: the browser language if supported, else English). Missing keys fall back to English.
+- **Other languages** are generated by Grok and committed, so switching needs no network:
+  `XAI_API_KEY=... node scripts/translate-i18n.mjs [es fr ...]` (model = make-plan's `DEFAULT_MODEL`, or `GROK_MODEL`).
+  The script checks every key and `{placeholder}` survives. Re-run it after adding strings to `en.json`.
+  Without `XAI_API_KEY` it uses the temporary `gen-assets` Edge Function (token from `GEN_ASSETS_TOKEN` or
+  `~/.gen-assets-token`), which calls Grok with the project's `GROK_API_KEY` secret.
+- **Dynamic Grok text** (plan titles, "why it fits", stop notes, transit tips) is translated on demand by the
+  `translate-plan` Edge Function and cached in `plans.translations` (migration `20260927000002_plan_translations.sql`).
+  English shows (with a shimmer) until the translation arrives, and stays if translation fails. Venue names and prices are never translated.
+  translate-plan only reads plan text (title, summary, why it fits, stop notes), never anyone's private answers.
