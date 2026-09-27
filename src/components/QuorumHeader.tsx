@@ -108,7 +108,9 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
 
   return (
     <>
-      <div className={`flex items-center justify-between gap-3 ${className}`}>
+      {/* relative z-30: the nav's backdrop-blur makes its own stacking context, so without this the bell list
+          painted under later positioned cards (e.g. the winner poster). */}
+      <div className={`relative z-30 flex items-center justify-between gap-3 ${className}`}>
         {showLogo ? (
           <p className="font-logo text-2xl font-semibold tracking-tight text-white lowercase sm:text-3xl">quorum</p>
         ) : (
@@ -145,7 +147,7 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
                 aria-label={t("notif.label")}
                 className="absolute end-0 top-[calc(100%+0.4rem)] z-50 w-[min(18.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-navy/10 bg-white text-navy shadow-xl"
               >
-                <div className="border-b border-navy/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-navy/60">
+                <div className="border-b border-navy/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-navy/75">
                   {t("notif.title")}
                 </div>
                 {empty ? (
