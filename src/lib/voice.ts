@@ -7,15 +7,18 @@
 import { invoke, InvokeError } from "./supabase";
 import {
   isInfraTranscribeFailure,
+  isPhone,
   isSpeechLevel,
   joinTranscriptParts,
   MAX_RECORD_MS,
   mimeToFilename,
+  nextNoiseFloor,
   pickRecorderMime,
   RECORDER_MIME_CANDIDATES,
   rmsFromTimeDomain,
   shouldAutoStop,
   shouldRestartRecognition,
+  shouldRunParallelStt,
   SILENCE_MS,
 } from "./voice-logic";
 
@@ -38,6 +41,11 @@ export function pickSupportedRecorderMime(): string {
 
 export function canRecordAudio(): boolean {
   return typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
+}
+
+export function parallelSttEnabled(): boolean {
+  if (!getSpeechRecognitionCtor()) return false;
+  return shouldRunParallelStt(import.meta.env.VITE_VOICE_PARALLEL, isPhone(navigator.userAgent, navigator.maxTouchPoints));
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -86,6 +94,7 @@ export async function recordAudio(opts: VoiceCaptureOpts): Promise<{ blob: Blob;
   let poll = 0;
   let heardSpeech = false;
   let lastSpeechAt: number | null = null;
+  let noiseFloor: number | null = null;
 
   const stopped = new Promise<Blob>((resolve, reject) => {
     rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || mime || RECORDER_MIME_CANDIDATES[0] }));
@@ -113,7 +122,10 @@ export async function recordAudio(opts: VoiceCaptureOpts): Promise<{ blob: Blob;
       poll = window.setInterval(() => {
         analyser.getByteTimeDomainData(buf);
         const now = Date.now();
-        if (isSpeechLevel(rmsFromTimeDomain(buf))) {
+        const rms = rmsFromTimeDomain(buf);
+        const speaking = noiseFloor !== null && isSpeechLevel(rms, noiseFloor);
+        noiseFloor = nextNoiseFloor(noiseFloor, rms);
+        if (speaking) {
           heardSpeech = true;
           lastSpeechAt = now;
         } else if (shouldAutoStop({ heardSpeech, lastSpeechAt, now, silenceMs })) {
@@ -161,7 +173,7 @@ type SpeechRec = {
   interimResults: boolean;
   start: () => void;
   stop: () => void;
-  onstart: (() => void) | null;
+  onaudiostart: (() => void) | null;
   onresult: ((e: { resultIndex: number; results: SpeechResultList }) => void) | null;
   onerror: ((e: { error?: string }) => void) | null;
   onend: (() => void) | null;
@@ -200,16 +212,21 @@ export function browserDictate(opts: VoiceCaptureOpts): Promise<string> {
     let silenced = false;
     let poll = 0;
     let maxTimer = 0;
-    let startedTimer = 0;
+    let started = false;
 
     const textNow = () => joinTranscriptParts([...finals, interim]);
+    // Only once audio is really flowing; `onstart` can fire while the permission prompt is still up.
+    const markStarted = () => {
+      if (started || settled) return;
+      started = true;
+      opts.onStarted?.();
+    };
 
     const finish = (text: string) => {
       if (settled) return;
       settled = true;
       window.clearInterval(poll);
       window.clearTimeout(maxTimer);
-      window.clearTimeout(startedTimer);
       opts.signal.removeEventListener("abort", onAbort);
       try {
         rec.stop();
@@ -225,6 +242,7 @@ export function browserDictate(opts: VoiceCaptureOpts): Promise<string> {
     };
 
     rec.onresult = (e) => {
+      markStarted();
       lastResultAt = Date.now();
       let nextInterim = "";
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -235,24 +253,22 @@ export function browserDictate(opts: VoiceCaptureOpts): Promise<string> {
       interim = nextInterim;
     };
 
+    const fail = (err: DOMException) => {
+      settled = true;
+      window.clearInterval(poll);
+      window.clearTimeout(maxTimer);
+      opts.signal.removeEventListener("abort", onAbort);
+      reject(err);
+    };
+
     rec.onerror = (e) => {
       const err = e.error ?? "";
-      if (err === "not-allowed") {
-        settled = true;
-        window.clearInterval(poll);
-        window.clearTimeout(maxTimer);
-        window.clearTimeout(startedTimer);
-        opts.signal.removeEventListener("abort", onAbort);
-        reject(new DOMException("Microphone permission denied.", "NotAllowedError"));
+      if (err === "not-allowed" || err === "service-not-allowed") {
+        fail(new DOMException("Microphone permission denied.", "NotAllowedError"));
         return;
       }
       if (err === "audio-capture") {
-        settled = true;
-        window.clearInterval(poll);
-        window.clearTimeout(maxTimer);
-        window.clearTimeout(startedTimer);
-        opts.signal.removeEventListener("abort", onAbort);
-        reject(new DOMException("No microphone found.", "NotFoundError"));
+        fail(new DOMException("No microphone found.", "NotFoundError"));
         return;
       }
       // no-speech / aborted / network: wait for onend so we never hang on "Listening…"
@@ -272,10 +288,7 @@ export function browserDictate(opts: VoiceCaptureOpts): Promise<string> {
       finish(textNow());
     };
 
-    rec.onstart = () => {
-      window.clearTimeout(startedTimer);
-      opts.onStarted?.();
-    };
+    rec.onaudiostart = markStarted;
 
     poll = window.setInterval(() => {
       if (lastResultAt !== null && shouldAutoStop({ heardSpeech: true, lastSpeechAt: lastResultAt, now: Date.now(), silenceMs })) {
@@ -287,7 +300,6 @@ export function browserDictate(opts: VoiceCaptureOpts): Promise<string> {
       reachedMax = true;
       finish(textNow());
     }, maxMs);
-    startedTimer = window.setTimeout(() => opts.onStarted?.(), 400);
 
     if (opts.signal.aborted) {
       onAbort();

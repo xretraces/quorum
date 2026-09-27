@@ -1,17 +1,19 @@
 // Tap to start, tap Stop to end (main path). Also auto-stops after ~2.5s of silence
 // once they have started talking, or at 45s. Audio goes to Grok Voice Transcribe.
-// If that fails, we use the browser transcript from the same take when we have one,
-// otherwise we start browser STT automatically (no extra tap).
+// If that fails, we use the browser transcript from the same take when we have one (laptops),
+// otherwise an infra failure starts browser STT automatically (no extra tap).
 import { useEffect, useRef, useState } from "react";
 import {
   browserDictate,
   canRecordAudio,
   grokVoiceUnavailable,
   MAX_RECORD_MS,
+  parallelSttEnabled,
   recordAudio,
   transcribeWithGrok,
   type VoiceSource,
 } from "../lib/voice";
+import { chooseTakeOutcome } from "../lib/voice-logic";
 
 type Phase = "idle" | "starting" | "recording" | "listening" | "transcribing";
 
@@ -74,9 +76,9 @@ export function VoiceButton({
   }
 
   async function finishGrok(signal: AbortSignal) {
-    // Same take: collect a browser transcript while we record, so a failed
-    // transcribe call can still post what they said without a second tap.
-    const browserP = browserDictate({ signal }).catch(() => "");
+    // Laptops: collect a browser transcript during the same take, so a failed transcribe
+    // call can still post what they said. Off on phones (see shouldRunParallelStt).
+    const browserP = parallelSttEnabled() ? browserDictate({ signal }).catch(() => "") : Promise.resolve("");
     let blob: Blob;
     let mime: string;
     try {
@@ -100,24 +102,37 @@ export function VoiceButton({
       return;
     }
     setPhase("transcribing");
+    let grokText = "";
+    let grokErr: unknown = null;
     try {
-      const result = await transcribeWithGrok(blob, mime, extraKeyterms);
-      if (!mountedRef.current) return;
-      await deliver(result.text, "grok");
+      grokText = (await transcribeWithGrok(blob, mime, extraKeyterms)).text ?? "";
     } catch (e) {
-      if (!mountedRef.current) return;
-      if (!grokVoiceUnavailable(e)) throw e;
-      preferBrowser.current = true;
-      if (browserText) {
-        onInfo?.(`Grok Voice is unavailable (${e instanceof Error ? e.message : String(e)}). Using the browser transcript from this take.`);
-        await deliver(browserText, "browser");
+      grokErr = e;
+    }
+    if (!mountedRef.current) return;
+
+    const infra = grokErr !== null && grokVoiceUnavailable(grokErr);
+    if (infra) preferBrowser.current = true;
+    const why = grokErr ? (grokErr instanceof Error ? grokErr.message : String(grokErr)) : "it heard silence";
+    const outcome = chooseTakeOutcome({ grokText, grokFailed: grokErr !== null, infra, browserText });
+    switch (outcome.kind) {
+      case "grok":
+        await deliver(outcome.text, "grok");
+        return;
+      case "browser":
+        onInfo?.(`Grok Voice couldn't transcribe this take (${why}). Using the browser transcript instead.`);
+        await deliver(outcome.text, "browser");
+        return;
+      case "relisten": {
+        onInfo?.(`Grok Voice is unavailable (${why}). Listening with the browser — speak again.`);
+        const ac = new AbortController();
+        abortRef.current = ac;
+        setPhase("starting");
+        await finishBrowser(ac.signal);
         return;
       }
-      onInfo?.(`Grok Voice is unavailable (${e instanceof Error ? e.message : String(e)}). Listening with the browser — speak again.`);
-      const ac = new AbortController();
-      abortRef.current = ac;
-      setPhase("starting");
-      await finishBrowser(ac.signal);
+      case "error":
+        throw grokErr ?? new Error("Grok Voice heard silence. Try again.");
     }
   }
 
