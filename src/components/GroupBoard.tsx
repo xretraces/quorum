@@ -42,6 +42,7 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false); // translated at render, so load() stays language-independent
   const [painting, setPainting] = useState<Set<string>>(new Set());
   const [myRun, setMyRun] = useState<GrokRun | null>(null);
   const [dismissedRun, setDismissedRun] = useState<number | null>(null);
@@ -60,11 +61,11 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
       supabase.from("plans").select("*").eq("group_id", groupId).order("option_index"),
     ]);
     if (g.error) setErr(g.error.message);
-    else if (!g.data) setErr(t("board.groupNotFound"));
+    else if (!g.data) setNotFound(true);
     else setGroup(g.data as Group);
     setMembers((m.data ?? []) as Member[]);
     setPlans((p.data ?? []) as Plan[]);
-  }, [groupId, t]);
+  }, [groupId]);
 
   useEffect(() => {
     load();
@@ -195,8 +196,8 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
   if (!group) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-gradient-to-b from-indigo-50 to-white p-4">
-        <p className="text-gray-600">{err ?? t("common.loading")}</p>
-        {err && <a href="/" onClick={home} className="text-indigo-600 underline">{t("board.backHome")}</a>}
+        <p className="text-gray-600">{err ?? (notFound ? t("board.groupNotFound") : t("common.loading"))}</p>
+        {(err || notFound) && <a href="/" onClick={home} className="text-indigo-600 underline">{t("board.backHome")}</a>}
       </div>
     );
   }
@@ -218,10 +219,10 @@ export function GroupBoard({ groupId, onHome }: { groupId: string; onHome: () =>
             <span className="inline-block rtl:-scale-x-100">←</span>
           </a>
           <div className="min-w-0 flex-1">
-            <a href="/" onClick={home} className="text-xs font-bold uppercase tracking-wide text-indigo-600">{t("board.homeLink")}</a>
-            <h1 className="truncate text-2xl font-bold text-gray-900">{group.name}</h1>
+            <a href="/" onClick={home} className="block truncate text-xs font-bold uppercase tracking-wide text-indigo-600">{t("board.homeLink")}</a>
+            <h1 dir="auto" className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{group.name}</h1>
           </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium ${badge.cls}`}>{t(badge.labelKey)}</span>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium max-sm:px-2 max-sm:text-xs ${badge.cls}`}>{t(badge.labelKey)}</span>
         </header>
 
         {!me && (

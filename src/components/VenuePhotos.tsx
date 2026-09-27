@@ -42,7 +42,7 @@ export function VenuePhotos({ items }: { items: PlanItem[] }) {
       <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-gray-100 text-4xl">
         <Photo item={first} i={0} className="h-full w-full" />
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 to-transparent p-2 pt-8">
-          <span className="min-w-0 truncate text-sm font-semibold text-white drop-shadow">📍 {short(first.name)}</span>
+          <span dir="auto" className="min-w-0 truncate text-sm font-semibold text-white drop-shadow">📍 {short(first.name)}</span>
           {rest.length > 0 && (
             <div className="flex shrink-0 gap-1.5 text-base">
               {rest.slice(0, 3).map((it, k) => (

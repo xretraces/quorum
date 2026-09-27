@@ -80,9 +80,9 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
                 {initials(m.display_name)}
               </span>
               <span className="min-w-0 flex-1 truncate font-medium text-gray-900">
-                {m.display_name}
-                {m.is_organizer && <span className="ml-1 text-xs font-normal text-gray-500">{t("lobby.creatorTag")}</span>}
-                {m.id === me?.id && <span className="ml-1 text-xs font-normal text-gray-500">{t("lobby.youTag")}</span>}
+                <bdi>{m.display_name}</bdi>
+                {m.is_organizer && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.creatorTag")}</span>}
+                {m.id === me?.id && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.youTag")}</span>}
               </span>
               {m.prefs_ready ? (
                 <span className="flex items-center gap-1 text-sm font-semibold text-emerald-600">

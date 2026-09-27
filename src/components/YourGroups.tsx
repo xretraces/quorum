@@ -95,16 +95,16 @@ export function YourGroups({ onOpen }: { onOpen: (groupId: string) => void }) {
               <li key={g.id}>
                 <button
                   onClick={() => onOpen(g.id)}
-                  className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left transition-colors hover:bg-indigo-50 active:bg-indigo-100"
+                  className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-start transition-colors hover:bg-indigo-50 active:bg-indigo-100"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-semibold text-gray-900">{g.name}</span>
+                      <span dir="auto" className="truncate font-semibold text-gray-900">{g.name}</span>
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${s.cls}`}>{t(s.labelKey)}</span>
                     </div>
                     <p className="mt-0.5 truncate text-sm text-gray-500">{t("groups.people", { count })}</p>
                   </div>
-                  <div className="shrink-0 text-right text-xs text-gray-500">
+                  <div className="shrink-0 text-end text-xs text-gray-500">
                     <div>{ago(activityOf(g), lang, t)}</div>
                   </div>
                 </button>

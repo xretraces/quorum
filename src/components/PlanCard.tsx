@@ -42,7 +42,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
           )}
           <h3 className={`text-lg font-bold leading-tight text-gray-900 ${shimmer}`}>{plan.title}</h3>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-end">
           <div className="text-xl font-bold text-indigo-600">{usd(plan.per_person_cents)}</div>
           <div className="text-[11px] text-gray-500">{t("plan.perPerson")}</div>
         </div>
@@ -53,7 +53,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
           <li key={i} className="flex gap-2 text-sm">
             <span className="w-[4.5rem] shrink-0 text-gray-500">{localStart(it.start_time, lang).time}</span>
             <span className="min-w-0">
-              <span className="font-medium text-gray-900">{it.name}</span>
+              <bdi className="font-medium text-gray-900">{it.name}</bdi>
               {it.note && <span className={`block text-xs text-gray-500 ${shimmer}`}>{it.note}</span>}
             </span>
           </li>

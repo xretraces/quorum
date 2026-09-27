@@ -31,7 +31,7 @@ export function Recap({ plan, url, painting, className = "" }: { plan: Plan; url
         </div>
       )}
       {painting && !show && (
-        <span className="absolute right-2 top-2 rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white motion-safe:animate-pulse">
+        <span className="absolute end-2 top-2 rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white motion-safe:animate-pulse">
           {t("recap.painting")}
         </span>
       )}

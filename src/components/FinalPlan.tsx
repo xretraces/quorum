@@ -70,7 +70,7 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
             const last = i === plan.items.length - 1;
             return (
               <li key={i} className="flex gap-3">
-                <div className="w-16 shrink-0 pt-0.5 text-right">
+                <div className="w-16 shrink-0 pt-0.5 text-end">
                   {s.day && <div className="text-[11px] font-semibold uppercase text-rose-500">{s.day}</div>}
                   <div className="text-sm font-bold leading-tight text-gray-900">{s.time}</div>
                 </div>
@@ -79,7 +79,7 @@ export function FinalPlan({ group, plan: original, members, painting }: Props) {
                   {!last && <span className="w-0.5 flex-1 bg-indigo-100" />}
                 </div>
                 <div className="min-w-0 flex-1 pb-4">
-                  <p className="font-semibold text-gray-900">{it.name}</p>
+                  <p className="font-semibold text-gray-900"><bdi>{it.name}</bdi></p>
                   {c && <p className="text-xs text-gray-500">{c.neighborhood}{c.duration_minutes ? t("final.aboutMinutes", { minutes: c.duration_minutes }) : ""}</p>}
                   {it.note && <p className={`text-xs text-gray-500 ${shimmer}`}>{it.note}</p>}
                   {transitNotes[i] && <p className={`mt-0.5 text-xs text-gray-400 ${shimmer}`}>🚇 {transitNotes[i]}</p>}
