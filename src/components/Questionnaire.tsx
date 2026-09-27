@@ -14,15 +14,16 @@ export type QuestionnaireHandle = {
 
 type Props = {
   memberId: string;
+  intro?: ReactNode;
   mic?: ReactNode;
   onSaved?: () => void;
   ref?: Ref<QuestionnaireHandle>;
 };
 
-const input = "mt-1 w-full rounded-lg border border-gray-300 p-3 text-base focus:border-transparent focus:ring-2 focus:ring-indigo-500";
-const label = "block text-sm font-medium text-gray-800";
+const input = "q-form-input";
+const label = "q-label font-medium";
 
-export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
+export function Questionnaire({ memberId, intro, mic, onSaved, ref }: Props) {
   const t = useT();
   const [prefs, setPrefs] = useState<Preferences>(EMPTY_PREFS);
   const [budgetText, setBudgetText] = useState("");
@@ -68,13 +69,14 @@ export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
   }
 
   return (
-    <form onSubmit={save} className="space-y-4">
-      <VoiceFill current={prefs} apply={applyPreferences} />
-      {mic && <div>{mic}</div>}
-      <p className="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white">{t("q.private")}</p>
-      <p className="text-sm text-gray-500">{t("q.blankHint")}</p>
+    <form onSubmit={save} className="space-y-3">
+      {intro}
+      <div className="q-paper space-y-4">
+        <VoiceFill current={prefs} apply={applyPreferences} />
+        {mic && <div>{mic}</div>}
+      </div>
 
-      <label className={label}>
+      <label className={`${label} q-paper block`}>
         {t("q.budget")}
         <input
           className={input}
@@ -85,25 +87,28 @@ export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
         />
       </label>
 
-      <label className={label}>
+      <label className={`${label} q-paper block`}>
         {t("q.dietary")}
         <input className={input} placeholder={t("q.noPreference")} value={prefs.dietary} onChange={(e) => set("dietary", e.target.value)} />
       </label>
 
-      <label className={label}>
+      <label className={`${label} q-paper block`}>
         {t("q.availability")}
         <input className={input} placeholder={t("q.noPreference")} value={prefs.availability} onChange={(e) => set("availability", e.target.value)} />
       </label>
 
-      <label className={label}>
+      <label className={`${label} q-paper block`}>
         {t("q.other")}
-        <textarea className={`${input} h-20 resize-none`} maxLength={1500} placeholder={t("q.noPreference")} value={prefs.other} onChange={(e) => set("other", e.target.value)} />
+        <textarea className={`${input} h-24 resize-none`} maxLength={1500} placeholder={t("q.noPreference")} value={prefs.other} onChange={(e) => set("other", e.target.value)} />
+        <span className="mt-2 block text-sm font-normal text-navy/55">{t("q.blankHint")}</span>
       </label>
 
-      <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
-        {busy ? t("q.saving") : t("q.submit")}
-      </button>
-      {err && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{err}</p>}
+      <div className="pt-2">
+        <button disabled={busy} className="q-btn q-btn-primary w-full sm:w-auto sm:min-w-44">
+          {busy ? t("q.saving") : t("q.submit")}
+        </button>
+      </div>
+      {err && <p role="alert" className="q-alert q-alert-error">{err}</p>}
     </form>
   );
 }

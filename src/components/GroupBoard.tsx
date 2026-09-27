@@ -9,7 +9,7 @@ import { useT, useTNodes } from "../i18n/hooks";
 import { buildFallbackPlans } from "../lib/fallback";
 import { type GrokOutcome, type GrokRun, useGrokRun } from "../lib/grokRun";
 import { isClosed } from "../lib/invite";
-import { type Group, invoke, InvokeError, type Member, myMemberId, type Plan, statusBadge, supabase } from "../lib/supabase";
+import { type Group, invoke, InvokeError, type Member, myMemberId, type Plan, supabase } from "../lib/supabase";
 import { FinalPlan } from "./FinalPlan";
 import { GrokWorking } from "./GrokWorking";
 import { Lobby } from "./Lobby";
@@ -18,6 +18,9 @@ import { Questionnaire } from "./Questionnaire";
 import { QuorumHeader } from "./QuorumHeader";
 
 export type Navigate = { replace?: boolean; state?: unknown };
+
+const backLink =
+  "inline-flex shrink-0 items-center text-2xl leading-none text-navy/70 transition-colors hover:text-navy";
 type Page = "lobby" | "answers";
 
 /** Live tally: the winner once every member has voted and one plan has the most votes. */
@@ -229,19 +232,19 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
 
   if (!group) {
     return (
-      <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4">
-        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <QuorumHeader groupId={groupId} tone="onLight" />
+      <div className="quorum-inner relative isolate min-h-dvh">
+        <div className="relative z-20 bg-spring-deep px-5 pt-[max(1.15rem,env(safe-area-inset-top))] pb-4 sm:px-8">
+          <QuorumHeader groupId={groupId} showLogo tone="onSpring" />
         </div>
-        <p className="relative z-10 text-gray-600">{err ?? (notFound ? t("board.groupNotFound") : t("common.loading"))}</p>
-        {(err || notFound) && <a href="/" onClick={home} className="relative z-10 text-navy underline">{t("board.backHome")}</a>}
+        <div className="relative z-10 px-5 pt-8 sm:px-8">
+          <p className={`text-navy/70 ${err || notFound ? "" : "motion-safe:animate-pulse"}`}>{err ?? (notFound ? t("board.groupNotFound") : t("common.loading"))}</p>
+          {(err || notFound) && <a href="/" onClick={home} className="mt-3 inline-flex text-sm font-semibold text-navy underline underline-offset-4">{t("board.backHome")}</a>}
+        </div>
       </div>
     );
   }
 
   const organizer = members.find((m) => m.is_organizer);
-  const badge = winner ? statusBadge("decided") : statusBadge(group.status);
-
   if (page === "answers") {
     const toLobby = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -249,69 +252,61 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
     };
     return (
       <div className="quorum-inner relative isolate min-h-dvh">
-        <div className="relative z-10 mx-auto max-w-md space-y-4 p-4">
-          <div className="flex justify-end">
-            <QuorumHeader groupId={groupId} tone="onLight" />
-          </div>
-          <header className="flex items-center gap-3">
-            <a
-              href={lobbyPath}
-              onClick={toLobby}
-              aria-label={t("answers.back")}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-navy shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
-            >
-              <span className="inline-block rtl:-scale-x-100">←</span>
-            </a>
-            <div className="min-w-0 flex-1">
-              <a href={lobbyPath} onClick={toLobby} className="block break-words text-xs font-semibold text-navy">{tNodes("answers.backTo", { group: iso(group.name) })}</a>
-              <h1 className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{t("lobby.yourAnswers")}</h1>
-            </div>
-          </header>
-          {me && stage === "lobby" ? (
-            <section className="rounded-2xl bg-white p-4 shadow-md">
-              <p className="mb-3 text-sm text-gray-600">{t(me.prefs_ready ? "answers.introEdit" : "answers.intro")}</p>
-              <Questionnaire
-                memberId={me.id}
-                onSaved={() => {
-                  setSavedNote(true);
-                  void load();
-                  backToLobby();
-                }}
-              />
-            </section>
-          ) : (
-            <p className="text-center text-gray-600">{t("common.loading")}</p>
-          )}
-          {err && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{err}</div>}
+        <div className="relative z-20 bg-spring-deep px-5 pt-[max(1.15rem,env(safe-area-inset-top))] pb-4 sm:px-8">
+          <QuorumHeader groupId={groupId} showLogo tone="onSpring" />
         </div>
+        <div className="relative z-10 px-5 pt-5 sm:px-8">
+          <a href={lobbyPath} onClick={toLobby} aria-label={t("answers.back")} className={backLink}>
+            <span className="inline-block rtl:-scale-x-100">←</span>
+          </a>
+        </div>
+        <main className="relative z-10 mx-auto w-full max-w-[40rem] px-5 pb-16 pt-4 sm:px-8">
+          {me && stage === "lobby" ? (
+            <Questionnaire
+              memberId={me.id}
+              intro={
+                <header className="q-paper">
+                  <p className="break-words text-sm font-semibold text-navy/55">{tNodes("answers.backTo", { group: iso(group.name) })}</p>
+                  <h1 className="font-logo mt-2 text-3xl leading-[1.05] font-bold tracking-tight text-navy sm:text-4xl">
+                    {t("lobby.yourAnswers")}
+                  </h1>
+                  <p className="mt-3 text-base leading-relaxed text-navy/70">
+                    {t(me.prefs_ready ? "answers.introEdit" : "answers.intro")}
+                  </p>
+                  <p className="mt-4 text-sm font-medium text-navy/80">{t("q.private")}</p>
+                </header>
+              }
+              onSaved={() => {
+                setSavedNote(true);
+                void load();
+                backToLobby();
+              }}
+            />
+          ) : (
+            <p className="text-navy/70 motion-safe:animate-pulse">{t("common.loading")}</p>
+          )}
+          {err && <div role="alert" className="q-alert q-alert-error mt-4">{err}</div>}
+        </main>
       </div>
     );
   }
 
   return (
     <div className="quorum-inner relative isolate min-h-dvh">
-      <div className="relative z-10 mx-auto max-w-md space-y-4 p-4">
-        <div className="flex justify-end">
-          <QuorumHeader groupId={groupId} tone="onLight" />
-        </div>
-        <header className="flex items-center gap-3">
-          <a
-            href="/"
-            onClick={home}
-            aria-label={t("board.backAria")}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-xl text-navy shadow-md ring-1 ring-spring/20 transition-colors hover:bg-spring/10"
-          >
+      <div className="relative z-20 bg-spring-deep px-5 pt-[max(1.15rem,env(safe-area-inset-top))] pb-4 sm:px-8">
+        <QuorumHeader groupId={groupId} showLogo tone="onSpring" />
+      </div>
+      <div className="relative z-10 px-5 pt-5 pb-12 sm:px-8">
+        <header className="flex items-center gap-4">
+          <a href="/" onClick={home} aria-label={t("board.backAria")} className={backLink}>
             <span className="inline-block rtl:-scale-x-100">←</span>
           </a>
-          <div className="min-w-0 flex-1">
-            <a href="/" onClick={home} className="font-logo block truncate text-xs font-semibold tracking-tight text-navy lowercase">{t("board.homeLink")}</a>
-            <h1 dir="auto" className="truncate text-2xl font-bold text-gray-900 rtl:text-right">{group.name}</h1>
-          </div>
-          <span className={`shrink-0 rounded-full px-3 py-1 text-sm font-medium max-sm:px-2 max-sm:text-xs ${badge.cls}`}>{t(badge.labelKey)}</span>
+          <h1 dir="auto" className="font-logo min-w-0 truncate text-3xl font-bold tracking-tight text-navy sm:text-4xl rtl:text-right">{group.name}</h1>
         </header>
 
+        <div className="mt-8">
         {!me && (
-          <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="q-alert q-alert-info mb-6 max-w-2xl">
             {isClosed(group) ? (
               t("board.viewingClosed")
             ) : (
@@ -327,41 +322,47 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
           <Lobby group={group} members={members} me={me} busy={!!busy} saved={savedNote} onAskGrok={askGrok} onOpenAnswers={openAnswers} />
         )}
 
-        {grokRun && <GrokWorking key={grokRun.startedAt} run={grokRun} isMine={grokRun === myRun} onDone={dismissGrokRun} />}
+        {grokRun && (
+          <div className="mb-10">
+            <GrokWorking key={grokRun.startedAt} run={grokRun} isMine={grokRun === myRun} onDone={dismissGrokRun} />
+          </div>
+        )}
 
         {stage === "vote" && (
-          <section className="space-y-4">
-            <div className="px-1">
-              <h2 className="text-lg font-bold text-gray-900">{t("board.whichPlan")}</h2>
-              <p className="text-sm text-gray-600">
+          <section className="space-y-8">
+            <div>
+              <h2 className="font-logo text-3xl font-bold tracking-tight text-navy sm:text-4xl">{t("board.whichPlan")}</h2>
+              <p className="q-muted mt-2 max-w-xl">
                 {t("board.votedCount", { voted, total: members.length })}
               </p>
             </div>
             {tied.length > 0 && (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <p className="max-w-xl text-sm font-semibold text-navy">
                 {t("board.tie")}{" "}
                 {me?.is_organizer ? t("board.tieCreator") : tNodes("board.tieWaiting", { name: iso(organizer?.display_name ?? t("common.theCreator")) })}
               </p>
             )}
-            {plans.map((p) => (
-              <PlanCard
-                key={p.id}
-                plan={p}
-                labels={labelsFor(p, plans).map((k) => t(k))}
-                voters={members.filter((m) => m.vote_plan_id === p.id)}
-                memberCount={members.length}
-                isMyVote={me?.vote_plan_id === p.id}
-                canVote={!!me}
-                busy={!!busy}
-                onVote={() => vote(p.id)}
-                onPick={me?.is_organizer && tied.some((t) => t.id === p.id) ? () => pick(p.id) : undefined}
-              />
-            ))}
+            <div className="grid items-start gap-10 lg:grid-cols-2 xl:grid-cols-3">
+              {plans.map((p) => (
+                <PlanCard
+                  key={p.id}
+                  plan={p}
+                  labels={labelsFor(p, plans).map((k) => t(k))}
+                  voters={members.filter((m) => m.vote_plan_id === p.id)}
+                  memberCount={members.length}
+                  isMyVote={me?.vote_plan_id === p.id}
+                  canVote={!!me}
+                  busy={!!busy}
+                  onVote={() => vote(p.id)}
+                  onPick={me?.is_organizer && tied.some((t) => t.id === p.id) ? () => pick(p.id) : undefined}
+                />
+              ))}
+            </div>
             {me?.is_organizer && (
               <button
                 disabled={!!busy}
                 onClick={askGrok}
-                className="w-full rounded-xl border border-gray-300 bg-white p-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="q-btn q-btn-secondary text-sm"
               >
                 {t("board.askAgain")}
               </button>
@@ -373,8 +374,9 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
           <FinalPlan group={group} plan={winner} members={members} painting={painting.has("final") || painting.has(winner.id)} />
         )}
 
-        {info && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">{info}</div>}
-        {err && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{err}</div>}
+        {info && <div className="q-alert q-alert-info mt-6 max-w-xl">{info}</div>}
+        {err && <div role="alert" className="q-alert q-alert-error mt-6 max-w-xl">{err}</div>}
+        </div>
       </div>
     </div>
   );
