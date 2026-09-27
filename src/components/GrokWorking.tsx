@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useT, useTNodes } from "../i18n/hooks";
 import type { GrokRun } from "../lib/grokRun";
-import { DemoPlanPill, GrokAvatar, GrokSays } from "./Grok";
+import { DemoPlanPill, QuorumSays } from "./Grok";
 
 // i18n keys (src/i18n/en.json): the step list and Grok's matching "is doing X…" line.
 const STEPS = ["working.step0", "working.step1", "working.step2", "working.step3", "working.step4"];
@@ -55,44 +55,39 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
   const backup = run.outcome === "backup";
 
   return (
-    <section ref={ref} aria-live="polite" className="space-y-3 rounded-2xl border border-indigo-100 bg-indigo-50 p-4 shadow-md">
-      <div className="flex items-center gap-2.5">
-        <GrokAvatar size={32} />
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="text-sm font-bold text-gray-900">Grok</p>
-          <p className="text-xs text-gray-500">{t("working.subtitle")}</p>
-        </div>
-        <span className="font-mono text-xs tabular-nums text-indigo-400">{clock}</span>
-      </div>
-
-      <p className="text-lg text-gray-900">
+    <section ref={ref} aria-live="polite" className="mx-auto w-full max-w-xl text-center">
+      <p className="text-sm font-semibold text-navy/55">{t("working.subtitle")}</p>
+      <p className="font-logo mt-3 text-3xl font-bold tracking-tight text-navy sm:text-4xl">
         {allDone ? (
-          <span className="font-semibold">{t(demo ? (backup ? "working.readyBackup" : "working.readyDemo") : "working.readyGrok")}</span>
+          <span>{t(demo ? (backup ? "working.readyBackup" : "working.readyDemo") : "working.readyGrok")}</span>
         ) : (
           <span key={doneCount} className="shimmer-text">
             {tNodes(SAYS[Math.min(doneCount, SAYS.length - 1)], { grok: <b>Grok</b> })}
           </span>
         )}
       </p>
-      {!isMine && !allDone && <p className="-mt-2 text-xs text-gray-500">{t("working.askedBy", { name: run.by })}</p>}
+      <p className="mt-3 font-mono text-sm tabular-nums text-navy/45">{clock}</p>
+      {!isMine && !allDone && <p className="mt-2 text-sm text-navy/55">{t("working.askedBy", { name: run.by })}</p>}
 
-      <ol className="space-y-2.5">
+      <ol className="mx-auto mt-8 w-fit space-y-2.5 text-start">
         {STEPS.map((label, i) => {
           const state = i < doneCount ? "done" : i === doneCount && !allDone ? "active" : "todo";
           return (
             <li key={label} className="flex items-center gap-3">
               {state === "done" ? (
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-xs font-bold text-white motion-safe:animate-pop">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-emerald-500 text-xs font-bold text-white motion-safe:animate-pop">
                   ✓
                 </span>
               ) : state === "active" ? (
-                <span className="h-6 w-6 shrink-0 rounded-full border-[3px] border-indigo-200 border-t-indigo-600 motion-safe:animate-spin" />
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 border-navy bg-sun">
+                  <span className="h-2 w-2 rounded-[2px] bg-navy motion-safe:animate-spin" />
+                </span>
               ) : (
-                <span className="h-6 w-6 shrink-0 rounded-full border-2 border-gray-200 bg-white" />
+                <span className="h-6 w-6 shrink-0 rounded-md border-2 border-dashed border-navy/25 bg-white" />
               )}
               <span
                 className={`text-sm transition-colors ${
-                  state === "done" ? "text-gray-700" : state === "active" ? "font-semibold text-indigo-700" : "text-gray-400"
+                  state === "done" ? "text-navy/75" : state === "active" ? "font-semibold text-navy" : "text-navy/40"
                 }`}
               >
                 {t(label)}
@@ -102,28 +97,30 @@ export function GrokWorking({ run, isMine, onDone }: { run: GrokRun; isMine: boo
         })}
       </ol>
 
-      <div className="h-1.5 overflow-hidden rounded-full bg-indigo-100">
+      <div className="mx-auto mt-8 h-1.5 max-w-sm overflow-hidden rounded-full bg-navy/10">
         <div
-          className="h-full rounded-full bg-indigo-500 transition-[width] duration-500"
+          className="h-full bg-sun transition-[width] duration-500"
           style={{ width: `${Math.max(6, (doneCount / STEPS.length) * 100)}%` }}
         />
       </div>
 
       {!allDone && (
-        <p className="text-xs text-gray-500">
+        <p className="mx-auto mt-3 max-w-sm text-sm text-navy/55">
           {elapsedS > SLOW_AFTER_S
             ? t("working.slow")
             : t("working.usual")}
         </p>
       )}
       {allDone && (
-        <GrokSays tag={demo && <DemoPlanPill backup={backup} />}>
-          {backup
-            ? t("working.doneBackup")
-            : demo
-              ? t("working.doneDemo")
-              : t("working.doneGrok")}
-        </GrokSays>
+        <div className="mx-auto mt-4 w-fit text-start">
+          <QuorumSays tag={demo && <DemoPlanPill backup={backup} />}>
+            {backup
+              ? t("working.doneBackup")
+              : demo
+                ? t("working.doneDemo")
+                : t("working.doneGrok")}
+          </QuorumSays>
+        </div>
       )}
     </section>
   );

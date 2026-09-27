@@ -9,7 +9,7 @@ import type { PlanItem } from "../lib/supabase";
 import { pickImage, venueCategory, type VenueImage } from "../lib/venuePhotos";
 
 const ICON: Record<string, string> = { food: "🍽️", activity: "🎯", outdoors: "🌳", attraction: "🎟️", museum: "🏛️", entertainment: "🎭" };
-const GRADIENTS = ["from-indigo-500 via-purple-500 to-pink-500", "from-amber-400 via-orange-500 to-rose-500", "from-emerald-400 via-teal-500 to-sky-600"];
+const GRADIENTS = ["from-navy via-spring-deep to-spring", "from-amber-500 via-amber-400 to-sun", "from-emerald-500 via-teal-500 to-spring-deep"];
 const short = (name: string) => name.replace(/\s*\(.*\)$/, "");
 
 function Photo({ item, img, i, className, onFail }: { item: PlanItem; img: VenueImage | null; i: number; className: string; onFail: (src: string) => void }) {
@@ -60,14 +60,14 @@ export function VenuePhotos({ items }: { items: PlanItem[] }) {
 
   return (
     <div>
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-gray-100 text-4xl">
+      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-lg bg-spring/20 text-4xl">
         <Photo item={first} img={shown[0]} i={0} className="h-full w-full" onFail={onFail} />
-        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-black/60 to-transparent p-2 pt-8">
+        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-2 bg-gradient-to-t from-navy/75 to-transparent p-2 pt-8">
           <span dir="auto" className="min-w-0 truncate text-sm font-semibold text-white drop-shadow">📍 {short(first.name)}</span>
           {rest.length > 0 && (
             <div className="flex shrink-0 gap-1.5 text-base">
               {rest.slice(0, 3).map((it, k) => (
-                <div key={k} className="h-12 w-12 overflow-hidden rounded-lg ring-2 ring-white" title={short(it.name)}>
+                <div key={k} className="h-12 w-12 overflow-hidden rounded-md border-2 border-white" title={short(it.name)}>
                   <Photo item={it} img={shown[k + 1]} i={k + 1} className="h-full w-full" onFail={onFail} />
                 </div>
               ))}
@@ -76,7 +76,7 @@ export function VenuePhotos({ items }: { items: PlanItem[] }) {
         </div>
       </div>
       {parts.length > 0 && (
-        <p data-testid="photo-credits" className="mt-1 px-1 text-[10px] leading-snug text-gray-400">
+        <p data-testid="photo-credits" className="mt-1 px-1 text-[10px] leading-snug text-navy/40">
           {parts.map((p, k) => (
             <span key={k}>
               {k > 0 && " · "}

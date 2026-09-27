@@ -5,9 +5,9 @@ import { useT } from "../i18n/hooks";
 import type { Plan } from "../lib/supabase";
 
 const GRADIENTS = [
-  "from-indigo-500 via-purple-500 to-pink-500",
-  "from-amber-400 via-orange-500 to-rose-500",
-  "from-emerald-400 via-teal-500 to-sky-600",
+  "from-navy via-spring-deep to-spring",
+  "from-amber-500 via-amber-400 to-sun",
+  "from-emerald-500 via-teal-500 to-spring-deep",
 ];
 
 export function Recap({ plan, url, painting, className = "" }: { plan: Plan; url: string | null | undefined; painting: boolean; className?: string }) {
@@ -16,7 +16,7 @@ export function Recap({ plan, url, painting, className = "" }: { plan: Plan; url
   const show = url && broken !== url;
 
   return (
-    <div className={`relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-gray-100 ${className}`}>
+    <div className={`relative w-full overflow-hidden rounded-lg bg-spring/20 ${className || "aspect-[16/10]"}`}>
       {show ? (
         <img
           src={url}
@@ -31,7 +31,7 @@ export function Recap({ plan, url, painting, className = "" }: { plan: Plan; url
         </div>
       )}
       {painting && !show && (
-        <span className="absolute end-2 top-2 rounded-full bg-black/40 px-2 py-0.5 text-[11px] font-semibold text-white motion-safe:animate-pulse">
+        <span className="q-tag absolute end-2 top-2 bg-sun text-navy motion-safe:animate-pulse">
           {t("recap.painting")}
         </span>
       )}

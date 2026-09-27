@@ -6,7 +6,7 @@ import {
 } from "../lib/booking";
 import { type Member, type Payment, type Plan, type SimReason, usd } from "../lib/supabase";
 import { CardLabel } from "./CardLabel";
-import { DemoPlanPill, GrokSays } from "./Grok";
+import { DemoPlanPill, QuorumSays } from "./Grok";
 
 type Props = { groupId: string; plan: Plan; me: Member; payments: Payment[]; simulated: SimReason | null };
 
@@ -160,9 +160,9 @@ export function YourPlan({ groupId, plan, me, payments, simulated }: Props) {
       )}
 
       {grokNote && (
-        <GrokSays label="why it works for you" tag={plan.model === "demo-fallback" && <DemoPlanPill />} className="rounded-xl bg-indigo-50 p-3">
+        <QuorumSays label="why it works for you" tag={plan.model === "demo-fallback" && <DemoPlanPill />} className="rounded-xl bg-indigo-50 p-3">
           {grokNote}
-        </GrokSays>
+        </QuorumSays>
       )}
 
       <button

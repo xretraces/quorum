@@ -10,7 +10,7 @@ const utilBtn =
   "inline-flex h-8 items-center justify-center rounded-full text-white/85 transition-colors hover:bg-white/20 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70";
 
 const utilBtnSolid =
-  "inline-flex h-8 items-center justify-center rounded-full text-navy transition-colors hover:bg-spring/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-spring-deep/40";
+  "inline-flex h-8 items-center justify-center rounded-md text-navy transition-colors hover:bg-sun focus:outline-none focus-visible:ring-2 focus-visible:ring-spring-deep/40";
 
 function GlobeIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -77,8 +77,8 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
   const navCls =
     tone === "onSpring"
       ? "flex items-center gap-0.5 rounded-full border border-white/40 bg-white/15 py-1 ps-1.5 pe-1 backdrop-blur-sm"
-      : "flex items-center gap-0.5 rounded-full border border-navy/15 bg-white/90 py-1 ps-1.5 pe-1 shadow-sm backdrop-blur-sm";
-  const divider = tone === "onSpring" ? "h-5 w-px bg-white/30" : "h-5 w-px bg-navy/20";
+      : "flex items-center gap-0.5 rounded-lg border-2 border-navy bg-white p-0.5";
+  const divider = tone === "onSpring" ? "h-5 w-px bg-white/30" : "h-5 w-0.5 bg-navy/15";
 
   useEffect(() => {
     if (!bellOpen) return;
@@ -112,7 +112,12 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
           painted under later positioned cards (e.g. the winner poster). */}
       <div className={`relative z-30 flex items-center justify-between gap-3 ${className}`}>
         {showLogo ? (
-          <p className="font-logo text-2xl font-semibold tracking-tight text-white lowercase sm:text-3xl">quorum</p>
+          <a
+            href="/"
+            className={`font-logo text-2xl font-semibold tracking-tight lowercase sm:text-3xl ${tone === "onSpring" ? "text-white" : "text-navy"}`}
+          >
+            quorum
+          </a>
         ) : (
           <span />
         )}
@@ -136,7 +141,7 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
             >
               <BellIcon />
               {unread > 0 && (
-                <span className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-sun px-1 text-[10px] font-bold text-navy">
+                <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-[4px] border border-navy bg-sun px-1 text-[10px] font-bold text-navy">
                   {unread > 9 ? "9+" : unread}
                 </span>
               )}
@@ -145,9 +150,9 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
               <div
                 role="dialog"
                 aria-label={t("notif.label")}
-                className="absolute end-0 top-[calc(100%+0.4rem)] z-50 w-[min(18.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-navy/10 bg-white text-navy shadow-xl"
+                className="absolute end-0 top-[calc(100%+0.5rem)] z-50 w-[min(18.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-[10px] border-2 border-navy bg-white text-navy shadow-[4px_4px_0_0_var(--color-navy)]"
               >
-                <div className="border-b border-navy/10 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-navy/75">
+                <div className="border-b-2 border-navy bg-sun px-3 py-2 text-xs font-bold tracking-wider text-navy uppercase">
                   {t("notif.title")}
                 </div>
                 {empty ? (
@@ -159,7 +164,7 @@ export function QuorumHeader({ groupId = null, tone = "onSpring", showLogo = fal
                     {items.map((n) => (
                       <li
                         key={n.key}
-                        className={`border-b border-navy/5 px-3 py-2.5 text-sm last:border-0 ${isUnread(n.key) ? "bg-spring/15" : ""}`}
+                        className={`border-b border-dashed border-navy/15 px-3 py-2.5 text-sm last:border-0 ${isUnread(n.key) ? "bg-spring/20 font-semibold" : ""}`}
                       >
                         <p className="leading-snug text-navy">{notifText(t, n)}</p>
                       </li>
@@ -204,34 +209,36 @@ function InfoSheet({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-labelledby="quorum-info-title">
       <button type="button" className="absolute inset-0 bg-navy/40 backdrop-blur-[2px]" aria-label={t("info.close")} onClick={onClose} />
-      <div className="relative z-10 max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-3xl sm:p-6">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <h2 id="quorum-info-title" className="font-logo text-xl font-semibold tracking-tight text-navy">
+      <div className="relative z-10 max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-[14px] border-2 border-b-0 border-navy bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-[12px] sm:border-b-2 sm:p-6 sm:shadow-[6px_6px_0_0_var(--color-navy)]">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h2 id="quorum-info-title" className="q-title text-2xl">
             {t("info.title")}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-navy/60 hover:bg-navy/5 hover:text-navy"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border-2 border-navy/20 font-bold text-navy hover:border-navy hover:bg-sun"
             aria-label={t("info.close")}
           >
             ✕
           </button>
         </div>
         <ol className="space-y-3 text-sm leading-relaxed text-navy/90">
-          <li><span className="font-semibold text-navy">1.</span> {t("info.step1")}</li>
-          <li><span className="font-semibold text-navy">2.</span> {t("info.step2")}</li>
-          <li><span className="font-semibold text-navy">3.</span> {t("info.step3")}</li>
-          <li><span className="font-semibold text-navy">4.</span> {t("info.step4")}</li>
+          {["info.step1", "info.step2", "info.step3", "info.step4"].map((k, i) => (
+            <li key={k} className="flex gap-3">
+              <span className="font-logo flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-sun text-xs font-bold text-navy">{i + 1}</span>
+              <span>{t(k)}</span>
+            </li>
+          ))}
         </ol>
-        <div className="mt-4 rounded-2xl bg-spring/25 p-3 text-sm leading-relaxed text-navy">
-          <p className="font-semibold">{t("info.privacyTitle")}</p>
+        <div className="mt-5 rounded-lg border-2 border-navy bg-spring/25 p-3 text-sm leading-relaxed text-navy">
+          <p className="font-bold">{t("info.privacyTitle")}</p>
           <p className="mt-1 text-navy/85">{t("info.privacyBody")}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="mt-5 min-h-12 w-full rounded-md bg-sun px-6 text-base font-semibold text-navy transition-opacity hover:opacity-90"
+          className="q-btn q-btn-primary mt-5 w-full"
         >
           {t("info.gotIt")}
         </button>

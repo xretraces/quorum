@@ -61,6 +61,12 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
     }
   }
 
+  const chrome = (
+    <div className="relative z-20 bg-spring-deep px-5 pt-[max(1.15rem,env(safe-area-inset-top))] pb-4 sm:px-8">
+      <QuorumHeader showLogo tone="onSpring" />
+    </div>
+  );
+
   if (load !== "ok" || !group) {
     const msg = {
       loading: t("common.loading"),
@@ -69,64 +75,75 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
       ok: t("common.loading"),
     }[load];
     return (
-      <div className="quorum-inner relative isolate flex min-h-dvh flex-col items-center justify-center gap-3 p-4 text-center">
-        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <QuorumHeader tone="onLight" />
+      <div className="quorum-inner relative isolate min-h-dvh">
+        {chrome}
+        <div className="relative z-10 px-5 pt-8 sm:px-8">
+          <p className={`max-w-md text-navy/70 ${load === "loading" ? "motion-safe:animate-pulse" : ""}`}>{msg}</p>
+          {load === "offline" && (
+            <button onClick={fetchGroup} className="q-btn q-btn-dark mt-4">{t("common.tryAgain")}</button>
+          )}
+          {load !== "loading" && <a href="/" className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-navy underline underline-offset-4">{t("join.goHome")}</a>}
         </div>
-        <p className="relative z-10 max-w-md text-gray-600">{msg}</p>
-        {load === "offline" && (
-          <button onClick={fetchGroup} className="relative z-10 min-h-11 rounded-xl bg-navy px-5 font-semibold text-white">{t("common.tryAgain")}</button>
-        )}
-        {load !== "loading" && <a href="/" className="relative z-10 inline-flex min-h-11 items-center text-navy underline">{t("join.goHome")}</a>}
       </div>
     );
   }
 
   if (isClosed(group)) {
     return (
-      <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
-        <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <QuorumHeader tone="onLight" />
-        </div>
-        <div className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 text-center shadow-lg ring-1 ring-spring/20">
-          <p className="font-logo text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
-          <h1 className="text-xl font-bold">{t("join.closedTitle", { group: group.name })}</h1>
-          <p className="text-sm text-gray-600">{t("join.closedBody")}</p>
-          <button onClick={() => onJoined(group.id, false)} className="w-full rounded-xl bg-navy p-3 font-semibold text-white hover:brightness-95">
-            {t("join.seePlan")}
-          </button>
-          <a href="/" className="inline-flex min-h-11 items-center text-sm text-navy underline">{t("join.startOwn")}</a>
+      <div className="quorum-inner relative isolate min-h-dvh">
+        {chrome}
+        <div className="relative z-10 px-5 pt-8 sm:px-8">
+          <a href="/" className="inline-flex items-center text-2xl leading-none text-navy/70 hover:text-navy">
+            <span className="rtl:-scale-x-100">←</span>
+          </a>
+          <div className="mt-8 max-w-xl">
+            <h1 className="font-logo text-4xl font-bold tracking-tight text-navy">{t("join.closedTitle", { group: group.name })}</h1>
+            <p className="q-muted mt-3">{t("join.closedBody")}</p>
+            <button onClick={() => onJoined(group.id, false)} className="q-btn q-btn-primary mt-6">
+              {t("join.seePlan")}
+            </button>
+            <a href="/" className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-navy underline underline-offset-4">{t("join.startOwn")}</a>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="quorum-inner relative isolate flex min-h-dvh items-center justify-center p-4">
-      <div className="absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.75rem,env(safe-area-inset-top))]">
-        <QuorumHeader tone="onLight" />
+    <div className="quorum-inner relative isolate min-h-dvh">
+      {chrome}
+      <div className="relative z-10 px-5 pt-5 sm:px-8">
+        <a href="/" className="inline-flex items-center text-2xl leading-none text-navy/70 hover:text-navy">
+          <span className="rtl:-scale-x-100">←</span>
+        </a>
       </div>
-      <form onSubmit={join} className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-spring/20">
-        <p className="font-logo text-center text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
-        <h1 className="text-xl font-bold text-gray-900">{t("join.title", { group: group.name })}</h1>
-        <input
-          className="w-full rounded-lg border border-gray-300 p-3 text-base focus:border-spring focus:outline-none focus:ring-2 focus:ring-spring/40"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={t("common.yourName")}
-          maxLength={40}
-          autoComplete="given-name"
-          enterKeyHint="go"
-          autoFocus
-          required
-        />
-        <button disabled={busy} className="w-full rounded-xl bg-navy p-3 font-semibold text-white transition-colors hover:brightness-95 disabled:opacity-50">
-          {busy ? t("join.joining") : t("join.join")}
-        </button>
-        <p className="text-center text-xs text-gray-500">
-          {group.status === "voting" ? t("join.votingHint") : t("join.nextHint")}
-        </p>
-        {err && <p role="alert" className="rounded bg-red-50 p-2 text-sm text-red-600">{err}</p>}
+      <form onSubmit={join} className="relative z-10 mx-auto w-full max-w-[40rem] space-y-3 px-5 pb-16 pt-4 sm:px-8">
+        <header className="q-paper">
+          <h1 className="font-logo text-3xl font-bold tracking-tight text-navy sm:text-4xl">{t("join.title", { group: group.name })}</h1>
+          <p className="mt-3 text-sm text-navy/65">
+            {group.status === "voting" ? t("join.votingHint") : t("join.nextHint")}
+          </p>
+        </header>
+        <label className="q-paper q-label block font-medium">
+          {t("common.yourName")}
+          <input
+            className="q-form-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={t("common.yourName")}
+            maxLength={40}
+            autoComplete="given-name"
+            enterKeyHint="go"
+            autoFocus
+            required
+          />
+        </label>
+        <div className="pt-2">
+          <button disabled={busy} className="q-btn q-btn-primary">
+            {busy ? t("join.joining") : t("join.join")}
+          </button>
+        </div>
+        {err && <p role="alert" className="q-alert q-alert-error">{err}</p>}
       </form>
     </div>
   );

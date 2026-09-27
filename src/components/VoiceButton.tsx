@@ -203,8 +203,8 @@ export function VoiceButton({
             ? t("voice.hintStarting")
             : t("voice.hintIdle")
       }
-      className={`${className ?? "rounded-xl border border-gray-300 px-4 py-3 text-gray-700 transition-colors hover:bg-gray-50"} disabled:opacity-50 ${
-        live ? "border-red-300 bg-red-50 font-semibold text-red-700 hover:bg-red-50" : ""
+      className={`${className ?? "q-btn q-btn-secondary"} disabled:opacity-50 ${
+        live ? "border-red-300! bg-red-50! font-semibold text-red-700! motion-safe:animate-pulse" : ""
       }`}
     >
       {label}

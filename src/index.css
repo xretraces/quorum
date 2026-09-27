@@ -23,6 +23,78 @@ body,
   background-color: #fff;
 }
 
+/* Shared building blocks. Utilities still override these (they live in a lower layer). */
+@layer components {
+  /* Main block on a screen: navy outline + hard offset shadow. Use sparingly. */
+  .q-card {
+    @apply rounded-[10px] border-2 border-navy bg-white p-5 shadow-[4px_4px_0_0_var(--color-navy)];
+  }
+  /* Secondary block: flat outline, no shadow. */
+  .q-panel {
+    @apply rounded-[10px] border-2 border-navy/15 bg-white p-4;
+  }
+  .q-title {
+    @apply font-logo text-[1.75rem] leading-[1.1] font-bold tracking-tight text-navy;
+  }
+  .q-h2 {
+    @apply font-logo text-lg leading-snug font-bold tracking-tight text-navy;
+  }
+  .q-eyebrow {
+    @apply inline-flex items-center gap-1.5 text-[11px] font-bold tracking-[0.12em] text-navy/60 uppercase before:h-2 before:w-2 before:shrink-0 before:bg-sun before:content-[''];
+  }
+  .q-muted {
+    @apply text-sm leading-relaxed text-navy/70;
+  }
+  .q-label {
+    @apply block text-sm font-bold text-navy;
+  }
+  .q-input {
+    @apply min-h-12 w-full rounded-lg border-2 border-navy/25 bg-white px-4 py-3 text-base text-navy transition-[border-color,box-shadow] placeholder:text-navy/40 focus:border-navy focus:shadow-[3px_3px_0_0_var(--color-spring-deep)] focus:outline-none;
+  }
+  .q-btn {
+    @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border-2 border-navy px-5 text-base font-bold transition-[transform,box-shadow,background-color] duration-100 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-spring-deep;
+  }
+  .q-btn-primary {
+    @apply bg-sun text-navy shadow-[3px_3px_0_0_var(--color-navy)] hover:-translate-x-px hover:-translate-y-px hover:shadow-[4px_4px_0_0_var(--color-navy)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none;
+  }
+  .q-btn-dark {
+    @apply bg-navy text-white hover:bg-[#1d6390];
+  }
+  .q-btn-secondary {
+    @apply bg-white text-navy hover:bg-spring/20;
+  }
+  .q-btn-soft {
+    @apply bg-spring/40 text-navy hover:bg-spring/60;
+  }
+  /* Disabled reads as "not yet", not as a faded button. */
+  .q-btn:disabled,
+  .q-btn:disabled:hover,
+  .q-btn:disabled:active {
+    @apply translate-0 cursor-not-allowed border-dashed border-navy/30 bg-navy/[0.03] text-navy/45 shadow-none;
+  }
+  .q-tag {
+    @apply inline-flex shrink-0 items-center gap-1 rounded-[4px] px-1.5 py-0.5 text-[11px] leading-4 font-bold tracking-wider uppercase;
+  }
+  .q-alert {
+    @apply rounded-lg border-2 px-4 py-3 text-sm font-medium;
+  }
+  .q-alert-error {
+    @apply border-red-300 bg-red-50 text-red-800;
+  }
+  .q-alert-info {
+    @apply border-sun bg-sun/15 text-navy;
+  }
+  .q-alert-success {
+    @apply border-emerald-400 bg-emerald-50 text-emerald-900;
+  }
+  .q-paper {
+    @apply rounded-xl bg-white px-6 py-6 shadow-[0_1px_2px_rgb(22_78_114/0.05),0_10px_28px_-18px_rgb(22_78_114/0.28)];
+  }
+  .q-form-input {
+    @apply mt-2 w-full border-0 border-b border-navy/20 bg-transparent px-0 py-2.5 text-base text-navy placeholder:text-navy/40 focus:border-spring-deep focus:ring-0 focus:outline-none;
+  }
+}
+
 /* Home screen only: spring-blue page (avoids purple overscroll). */
 .quorum-create {
   font-family: var(--font-ui);
@@ -37,33 +109,22 @@ html:has(.quorum-create) #root {
   background-color: var(--color-spring-deep);
 }
 
-/* Join + group board: white page, spring-blue bubbles, no purple chrome. */
+/* Join, lobby, answers, vote, winner: same soft spring wash as the form. */
 .quorum-inner {
   font-family: var(--font-ui);
-  background-color: #fff;
+  color: var(--color-navy);
+  background-color: #d4eef8;
 }
 
 html:has(.quorum-inner),
 html:has(.quorum-inner) body,
 html:has(.quorum-inner) #root {
-  background-color: #fff;
+  background-color: #d4eef8;
 }
 
-.quorum-inner::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(circle 10rem at 8% 0%, color-mix(in srgb, var(--color-spring) 42%, transparent), transparent 68%),
-    radial-gradient(circle 7rem at 96% 18%, color-mix(in srgb, var(--color-spring) 34%, transparent), transparent 70%),
-    radial-gradient(circle 9rem at 78% 100%, color-mix(in srgb, var(--color-spring) 24%, transparent), transparent 72%);
-}
-
-/* "Grok is reading the chat…" shimmer (design-refs/chat/20). */
+/* Loading shimmer for text that's still being written or translated. */
 .shimmer-text {
-  background: linear-gradient(90deg, #4b5563 0%, #4b5563 40%, #a5b4fc 50%, #4b5563 60%, #4b5563 100%);
+  background: linear-gradient(90deg, #164e72 0%, #164e72 40%, #9ad6f4 50%, #164e72 60%, #164e72 100%);
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -77,5 +138,5 @@ html:has(.quorum-inner) #root {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .shimmer-text { animation: none; color: #374151; }
+  .shimmer-text { animation: none; color: #164e72; }
 }

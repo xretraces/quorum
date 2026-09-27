@@ -147,7 +147,7 @@ export function dietNotesFor(m: Member, plan: Plan): { stop: string; note: strin
 export const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("") || "?";
 
-const AVATAR_COLORS = ["bg-indigo-500", "bg-emerald-500", "bg-amber-500", "bg-rose-500", "bg-sky-500", "bg-violet-500"];
+const AVATAR_COLORS = ["bg-navy", "bg-spring-deep", "bg-emerald-500", "bg-amber-500", "bg-rose-400", "bg-sky-600"];
 export function avatarColor(name: string) {
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
