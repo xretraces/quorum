@@ -1,8 +1,8 @@
 # Quorum
 
-*Turn messy group chats into a plan everyone can pay for.*
+*Everyone answers privately. Grok finds the plan that works for all of you.*
 
-Friends create or join a group from their phones, set a personal spending limit, and chat. One tap sends the chat to **Grok**, which extracts each person's budget, diet, availability, and transport and proposes 2–3 real Atlanta plans with an *estimated* per-person cost and a note on why each plan fits each person. The server (not the AI) re-checks every price and budget. Everyone approves or rejects live. If someone rejects a plan as "too expensive", Grok regenerates with everyone's cap as a hard limit. When the organizer locks a plan, each person places a **Stripe test-mode card hold** (manual capture), and money is captured only when **every** member has approved. Anyone over their cap must explicitly approve the higher amount. Built at HackGT 13.
+The creator makes a group and shows a big **QR code** (or copies/shares the link). Friends scan it and join with just a name; the lobby shows them appearing live. Each person fills a short **private questionnaire** (budget, food, getting there, when they're free, hard no's, anything else). **Only Grok sees the answers**; everyone else just sees a ✓ Ready checkmark. When everyone is ready (or at least 2 and the creator taps "Plan it anyway"), the creator taps **Ask Grok**. The `make-plan` function reads the answers server-side and returns 2-3 real Atlanta plans; budget is a hard per-person cap and hard no's are strict exclusions, re-checked by the server. Each card gets a **Grok Imagine** picture, a group-level "why it fits" line that never names anyone, and labels like "Fits everyone" / "Cheapest". Everyone taps **I'm in** on one plan; once everyone has voted the top plan wins (the creator breaks ties) and every phone switches live to **Your plan** with **Add to calendar**. No chat, no payments. Built at HackGT 13.
 
 ## Stack
 
@@ -48,8 +48,9 @@ docs/TEAM_SPEC.md        original product spec (screens/flow/UX; ignore its Expr
 
 ## Database
 
-Project ref **`oavxpwpdhdazhtieikju`**. Both migrations are **already applied** to the live database; the files are here for reference and for fresh projects. Don't re-run them against the shared DB (they are idempotent, but there's no need).
+Project ref **`oavxpwpdhdazhtieikju`**. The first two migrations are **already applied** to the live database; the files are here for reference and for fresh projects. Don't re-run them against the shared DB (they are idempotent, but there's no need).
 
+- **Not applied yet:** `20260927000001_private_prefs.sql` (private `member_prefs` + RPCs, `members.prefs_ready`, `plans.recap_image_url`, `groups.status` value `decided`). The new flow needs it.
 - `groups`, `members`, `plans`, `payments`: kit schema, permissive demo RLS, Realtime on. `payments` is read-only for clients.
 - `messages`: live group chat (`sender_name`, `text`, `created_at`), Realtime on.
 - Rejections are stored in `members.constraints.rejection = { plan_id, reason, at }`, so no schema change was needed. `make-plan` overwrites `constraints`, which clears the rejection.
@@ -57,18 +58,27 @@ Project ref **`oavxpwpdhdazhtieikju`**. Both migrations are **already applied** 
 
 ## How the flow maps to the code
 
-| Step (TEAM_SPEC) | Where |
+| Step | Where |
 | --- | --- |
-| Create / join group, name + spending limit (validated) | `CreateGroup.tsx`, `JoinGroup.tsx` |
-| Live group chat | `GroupChat.tsx` (`messages` + Realtime) |
-| Generate Plan → Grok | `GroupBoard.generate()` → `make-plan` with the chat transcript |
-| Plan cards, estimated cost, per-member budget check | `PlanCard.tsx` (budget math in code: `overCapBy`) |
-| Approve / reject live | Approve = `members.vote_plan_id`; Reject = `RejectButton.tsx`; everyone refetches on Realtime |
-| Rejected "too expensive" → regenerate with hard caps | `GroupBoard` banner → `make-plan` with `hard_cap: true` (server drops over-cap plans) |
-| Over-budget user must approve explicitly | `pay` returns `needs_reapproval` → `PayButton` "Approve anyway" |
-| Book & split (test-mode holds), confirmation | Organizer "Lock & collect" → `pay hold`; `PayButton` per member; `pay approve` captures all when everyone is in; `LockedPlan.tsx` |
-| Grok failure | `lib/fallback.ts`: saved plans (recomputed against the real roster) + a visible "demo plan" banner |
-| Stripe not configured / pay failure | `lib/payments.ts`: simulated holds with the same rules + a visible "Simulated payment (test)" badge |
+| Create (group + your name) / join (name only) | `CreateGroup.tsx`, `JoinGroup.tsx` (both call `claimMember`) |
+| Lobby: QR, Copy link, Share, live members + ready checks | `Lobby.tsx` (`qrcode.react`, Realtime on `members`) |
+| Private questionnaire | `Questionnaire.tsx` + `lib/prefs.ts` (`save_my_prefs` / `get_my_prefs` RPCs). Voice can fill it via `ref.current.applyPreferences(partial)` |
+| Ask Grok / Plan it anyway (creator) | `GroupBoard.askGrok()` → `make-plan { group_id }` + the shared "Grok is working" card |
+| Plans from private answers | `make-plan` + `_shared/prefsPlan.ts` (anonymized Grok call, server re-checks, backup plans) |
+| Grok Imagine picture per plan | `Recap.tsx`; creator's phone calls `recap-image { group_id, plan_id }` per plan |
+| Vote, live counts, winner, tie-break | `PlanCard.tsx`, `tally()` in `GroupBoard.tsx` (`members.vote_plan_id`, `groups.selected_plan_id`, status `decided`) |
+| Your plan, Add to calendar, Share | `FinalPlan.tsx`, `lib/calendar.ts` (.ics) |
+| Grok down | `make-plan` builds "Backup plan"s from the same answers. If `make-plan` itself can't be reached: saved "Demo plan"s (`lib/fallback.ts`, not checked against answers because the browser can't read them) |
+
+Unused but kept: `GroupChat`, `LockedPlan`, `PayButton`, `RejectButton`, `Booked`, `YourPlan`, `CardLabel`, `lib/payments.ts`, the `pay` function, the `messages` table, and the old chat prompt/schema (`prompts/make-plan.md`, `schema/plan.schema.json`, `tools/prompt-tests`), which `make-plan` no longer uses.
+
+### Privacy of answers
+
+Answers live in `member_prefs` (migration `20260927000001_private_prefs.sql`): RLS on, **no policies**, no grants for `anon`/`authenticated`, not in Realtime. A phone proves it owns its member with a token from `claim_member` (handed out once per member, stored in that phone's `localStorage`) and reads/writes only through `save_my_prefs` / `get_my_prefs`. `make-plan` reads everyone's answers with the service role. Grok sees them as "Person 1..N"; plan rows store no per-member notes, no over-cap ids and no raw model output, and plan text that mentions a name or a dollar amount is replaced by a server-written line. Without login this is still demo-grade: whoever claims a member first owns it.
+
+### make-plan
+
+`POST /functions/v1/make-plan { group_id }` → `{ plans, model, source: "grok" | "backup", answered }`. Needs answers from at least 2 members (1 in a solo group). Hard rules checked in code: sum of catalog prices ≤ lowest budget, no item matching a hard no (name/category/tags plus a few aliases like heights → rooftop/summit), veg-friendly food if anyone is vegetarian/vegan, transit-friendly items if anyone takes MARTA or walks, every stop inside the shared free window. Plans that fail are dropped; if none survive or Grok fails, deterministic backup plans are built from the same rules. 422 if nothing in the catalog fits.
 
 ## Deploy edge functions (Supabase CLI)
 
@@ -138,6 +148,8 @@ GROK_API_KEY=xai-... python3 run.py
 
 ## Stripe test cards
 
+> Old flow (unused).
+
 | Card | Result |
 | --- | --- |
 | `4242 4242 4242 4242` (Visa) | Hold succeeds (`requires_capture`). Use this one for the demo. |
@@ -147,6 +159,8 @@ GROK_API_KEY=xai-... python3 run.py
 Any future expiry, any CVC, any ZIP. Holds show as **Uncaptured** in Stripe Dashboard (test mode) → Payments.
 
 ## Simulated payments (demo-safe fallback)
+
+> Old flow: payments are no longer part of the app. Kept for reference.
 
 Like the saved demo plan for Grok, "Lock & collect" has a fallback that needs no Stripe at all. It walks the same steps: each member places a hold capped at their budget, an over-cap member must tap "Approve anyway" first, the last approval captures everything, and "Cancel group" releases every hold. It uses the `pay` function's own rules (`decideHold`, `approvalCovers`, `captureReadiness` imported from `supabase/functions/_shared/logic.ts`). The card form becomes a single **Hold $X (simulated)** button, and the locked plan and confirmation show a **Simulated payment (test)** badge with the reason. No card is charged and nothing is sent to Stripe.
 
@@ -160,6 +174,8 @@ Like the saved demo plan for Grok, "Lock & collect" has a fallback that needs no
 How it syncs: simulated state lives in `members.constraints.sim_payment` plus the usual `members.approved*` and `groups.status` columns, so every phone follows along over the existing Realtime subscriptions. A group counts as simulated once any member has a `sim_payment` for the locked plan, so every phone in that group uses the simulated path whatever its own env says. If Stripe fails in the middle of a real flow, approvals are kept, holds that were already authorized carry over as placed, and the real test-mode holds are never captured (Stripe releases uncaptured test authorizations on its own). Generating new plans clears the simulated holds, the same way it clears rejections.
 
 ## Demo script (2–3 min)
+
+> Written for the old chat + payments flow; needs a rewrite for lobby → questionnaire → vote.
 
 **0:00, the hook (Meta: human connection).** "Every group chat has this: 40 messages, no plan, and one friend quietly can't afford the idea everyone's excited about. Quorum turns the chat into a plan that works for *everyone*, and nobody has to front the money."
 
