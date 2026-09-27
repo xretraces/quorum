@@ -22,10 +22,12 @@ test("a failed image falls through to the next kind", () => {
   assert.equal(pickImage(ids[0]!, new Set([first!.src]))?.kind, "stock");
 });
 
-test("every catalog venue shows a real photo of the place, with a credit and a file on disk", () => {
+// Venues added without a photo of their own (e.g. the pizza places) show their category's stock photo.
+test("every catalog venue shows a real photo (or its category's stock one), with a credit and a file on disk", () => {
+  const own = new Map((CATALOG_FILE.activities as unknown as { id: string; photos?: unknown[] }[]).map((a) => [a.id, a.photos?.length ?? 0]));
   for (const id of ids) {
     const p = pickImage(id);
-    assert.equal(p?.kind, "real", `${id} should have a real photo`);
+    assert.equal(p?.kind, own.get(id) ? "real" : "stock", `${id} should have a real photo`);
     assert.ok(p!.author && p!.license && p!.source && p!.site, `${id} credit incomplete`);
     assert.ok(existsSync(new URL(`../../public${p!.src}`, import.meta.url)), `${id}: missing public${p!.src}`);
   }

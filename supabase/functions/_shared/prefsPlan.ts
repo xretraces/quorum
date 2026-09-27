@@ -6,9 +6,13 @@
 // transit only, "free after 5pm" style availability becomes a shared time window, and every stop must start and
 // end inside the venue's typical opening hours. Anything that fails a hard rule is dropped. The same rules drive
 // the no-Grok backup plans.
+// Explicit requests ("craving pizza", "quiero pizza", "can we do the aquarium") are MUST-INCLUDE: a solo planner
+// gets every plan anchored on one, a group gets at least one plan per request, unless nothing matching passes the
+// hard rules. The server checks this and repairs the plan list (honorRequests), for Grok and backup plans alike.
 // Nothing stored on a plan names a member or reveals one person's budget or constraints.
 import type { CatalogItem } from "./logic.ts";
 import { normalizePrefs, type Preferences } from "./preferences.ts";
+import { matchesRequest, requestKeysOf, requestKind } from "./requests.ts";
 
 export type CatalogEntry = CatalogItem & {
   duration_minutes?: number;
@@ -36,7 +40,12 @@ export type GroupNeeds = {
   windowUntil: number | null; // earliest "free until"
   hardNoTerms: string[]; // from everyone's "other", expanded with synonyms (drink -> bar, brewery, ...)
   anyTimes: boolean;
+  requestKeys: string[]; // explicit requests in anyone's dietary/other text ("pizza", "aquarium"), see requests.ts
+  requests: GroupRequest[]; // requestKeys that some catalog item can satisfy under the hard rules (settleRequests)
 };
+
+/** A must-include request and the catalog ids that satisfy it and pass every hard rule on their own. */
+export type GroupRequest = { key: string; label: string; ids: string[] };
 
 export type PlanRow = {
   option_index: number;
@@ -273,7 +282,27 @@ export function groupNeeds(all: Preferences[], partySize: number): GroupNeeds {
     windowUntil,
     hardNoTerms: [...new Set(all.flatMap((p) => hardNoTermsOf(p.other)))],
     anyTimes: all.some((p) => p.availability.trim().length > 0),
+    requestKeys: [...new Set(all.flatMap((p) => requestKeysOf(`${p.dietary}\n${p.other}`)))],
+    requests: [],
   };
+}
+
+/** True if the item can be a plan on its own: some start time inside its hours passes every hard rule. */
+export function fitsAlone(c: CatalogEntry, needs: GroupNeeds): boolean {
+  const starts = schedule([c], needs);
+  return starts !== null && violations([{ c, start: starts[0] }], needs).length === 0;
+}
+
+/**
+ * Keeps the requests some catalog item can satisfy under the hard rules (budget, hard no's, diet, transit, time).
+ * A request that conflicts with someone's hard no or the budget is dropped here, silently: that is the hard rule winning.
+ */
+export function settleRequests(needs: GroupNeeds, catalog: CatalogEntry[]): GroupNeeds {
+  const requests = needs.requestKeys.flatMap((key) => {
+    const ids = catalog.filter((c) => matchesRequest(c, key) && fitsAlone(c, needs)).map((c) => c.id);
+    return ids.length ? [{ key, label: requestKind(key)?.label ?? key, ids }] : [];
+  });
+  return { ...needs, requests };
 }
 
 /**
@@ -422,9 +451,9 @@ export const PREFS_PLAN_SCHEMA = {
   },
 } as const;
 
-export const PREFS_PLAN_PROMPT = `You are Grok, the planner inside Quorum, a group-outing app for friends in Atlanta.
-Each person answered a private questionnaire. You get their answers anonymized as "Person 1", "Person 2", ... plus group_rules the server computed from them, and a catalog.
-Propose 2 or 3 meaningfully different plans for ${DAY}.
+export const PREFS_PLAN_PROMPT = `You are Quorum, the planner inside a group-outing app for friends in Atlanta.
+Each person answered a private questionnaire. You get their answers anonymized as "Person 1", "Person 2", ... plus group_rules the server computed from them, and a catalog (already filtered to places that pass the group's hard rules one at a time).
+Propose 3 genuinely different plans for ${DAY} (2 only if the catalog can't support 3). No two plans may have the same stops; avoid repeating a stop across plans.
 HARD RULES (a plan that breaks one is thrown away):
 - Use ONLY catalog items, by exact "id". 1 to 4 items per plan.
 - The sum of price_per_person_cents of a plan's items must be <= group_rules.max_per_person_cents (when not null). Free items count.
@@ -433,10 +462,14 @@ HARD RULES (a plan that breaks one is thrown away):
 - If group_rules.gluten_free_food_only, every food item must have gf_friendly = true (items that are not food are fine).
 - If group_rules.transit_only, every item must have transit_friendly = true.
 - If group_rules.time_window is set, every item must start at or after "from" and end (start + duration_minutes) by "until". Respect typical_hours.
+MUST-INCLUDE: group_rules.must_include lists explicit requests from the answers ("craving pizza", "quiero sushi", "can we do the aquarium"), each with the catalog ids that satisfy it (those catalog items also carry matches_request).
+- If group_rules.solo is true (one person planning alone), EVERY plan must include one of the matching ids for a request, with a different matching place in each plan when there are several, and different other stops, so the three options really differ.
+- Otherwise, for EACH request, at least one plan must include one of its matching ids. Spread requests across plans so every person's request shows up somewhere.
+- Requests never override the hard rules above; the server already removed any that conflict.
 If group_rules.gluten_free_check_note, gluten-free food options are limited: any food item is allowed, but the summary of every plan with a food item that lacks gf_friendly = true must tell the group to check gluten-free options with the venue.
-SOFT: honor each person's dietary text and availability in their own words, plus "other" notes, and variety (e.g. a free/cheap plan, a food-focused one, something special). Only group_rules.time_window is a hard clock window; the rest of the availability text is soft. A null budget, dietary, availability, or other means that person has no preference for it. Do not invent a limit or restriction for a null field.
+SOFT: honor each person's dietary text (diets, allergies and cravings) and availability in their own words, plus "other" notes, and variety: the plans should reflect THESE answers, not a default itinerary. Use variety_seed only to break ties between equally good options. Only group_rules.time_window is a hard clock window; the rest of the availability text is soft. A null budget, dietary, availability, or other means that person has no preference for it. Do not invent a limit or restriction for a null field.
 start_time format: "${DAY} 2:00 PM". Leave a little travel time between stops.
-PRIVACY (everyone in the group reads these plans): never mention any person, "Person N", a name, a dollar amount, or one person's constraint. Never write "someone", "one of you" or similar. why_it_fits is ONE short line about the group as a whole, e.g. "Under everyone's budget, vegetarian and gluten-free options, reachable by MARTA". Item notes describe the place, not people.
+PRIVACY (everyone in the group reads these plans): never mention any person, "Person N", a name, a dollar amount, or one person's constraint. Never write "someone", "one of you" or similar. why_it_fits is ONE short line about the group as a whole, e.g. "Under everyone's budget, vegetarian and gluten-free options, reachable by MARTA". Item notes describe the place, not people. If the text refers to the app or planner, call it Quorum.
 Output only the JSON object required by the schema.`;
 
 /** Blank text is no preference, so Grok receives null instead of an empty string. */
@@ -445,8 +478,25 @@ const prefText = (s: string) => {
   return t === "" ? null : t;
 };
 
-/** Anonymized Grok user message. Names never leave the server. */
-export function grokPayload(all: Preferences[], needs: GroupNeeds, catalog: CatalogEntry[]) {
+/** Fisher-Yates with an injectable rng (tests pass a seeded one). Returns a copy. */
+export function shuffled<T>(xs: readonly T[], rng: () => number): T[] {
+  const out = [...xs];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+/** Catalog items Grok may use: the ones that pass every hard rule on their own, shuffled when `rng` is given. */
+export function catalogForGrok(catalog: CatalogEntry[], needs: GroupNeeds, rng?: () => number): CatalogEntry[] {
+  const ok = catalog.filter((c) => fitsAlone(c, needs));
+  return rng ? shuffled(ok, rng) : ok;
+}
+
+/** Anonymized Grok user message. Names never leave the server. `catalog` should come from catalogForGrok(). */
+export function grokPayload(all: Preferences[], needs: GroupNeeds, catalog: CatalogEntry[], varietySeed = 0) {
+  const requestOf = (id: string) => needs.requests.find((r) => r.ids.includes(id))?.label ?? null;
   const hhmm = (m: number | null) => (m === null ? null : `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`);
   return {
     party_size: needs.partySize,
@@ -467,9 +517,13 @@ export function grokPayload(all: Preferences[], needs: GroupNeeds, catalog: Cata
         ? { from: hhmm(needs.windowFrom), until: hhmm(needs.windowUntil) }
         : null,
       hard_no_terms: needs.hardNoTerms,
+      solo: needs.partySize === 1,
+      must_include: needs.requests.map((r) => ({ request: r.label, catalog_ids: r.ids })),
     },
-    catalog: catalog.map(({ id, name, category, neighborhood, price_per_person_cents, veg_friendly, gf_friendly, gf_note, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note }) => ({
-      id, name, category, neighborhood, price_per_person_cents, veg_friendly, gf_friendly, gf_note, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note,
+    variety_seed: varietySeed,
+    catalog: catalog.map(({ id, name, category, neighborhood, price_per_person_cents, veg_friendly, gf_friendly, gf_note, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note, tags }) => ({
+      id, name, category, neighborhood, price_per_person_cents, veg_friendly, gf_friendly, gf_note, transit_friendly, typical_hours, duration_minutes, transit_note, dietary_note, tags,
+      matches_request: requestOf(id),
     })),
   };
 }
@@ -496,14 +550,17 @@ export function normalizeGrokPlans(
     }
     const cs = items.map((i) => i.c);
     out.push(toRow(out.length, {
-      title: leaksPrivate(p.title, names) ? titleOf(cs) : p.title.trim(),
-      summary: withGfCheck(leaksPrivate(p.summary, names) ? summaryOf(cs) : p.summary.trim(), needs, cs),
-      items: items.map(({ c, it }) => ({ c, start_time: it.start_time, note: leaksPrivate(it.note, names) ? "" : it.note.trim() })),
-      why: p.why_it_fits.trim() && !leaksPrivate(p.why_it_fits, names) ? p.why_it_fits.trim() : whyItFits(needs, cs),
+      title: leaksPrivate(p.title, names) ? titleOf(cs) : asQuorum(p.title),
+      summary: withGfCheck(leaksPrivate(p.summary, names) ? summaryOf(cs) : asQuorum(p.summary), needs, cs),
+      items: items.map(({ c, it }) => ({ c, start_time: it.start_time, note: leaksPrivate(it.note, names) ? "" : asQuorum(it.note) })),
+      why: p.why_it_fits.trim() && !leaksPrivate(p.why_it_fits, names) ? asQuorum(p.why_it_fits) : whyItFits(needs, cs),
     }, needs));
   }
   return { plans: out, dropped };
 }
+
+/** User-visible text calls the AI "Quorum", never the model's own name. */
+const asQuorum = (s: string) => s.trim().replace(/\bGrok\b/gi, "Quorum");
 
 function toRow(
   index: number,
@@ -564,33 +621,47 @@ const sameArea = (a: CatalogEntry, b: CatalogEntry) => areaWords(a).some((w) => 
 export const WINDOW_RELAXED_NOTICE = "Nothing open fits everyone's free time, so these plans use different times.";
 
 /**
- * Deterministic plans from the catalog that pass every hard rule: an activity then a food stop (nearby pairs
- * first), else single stops. Picks up to 3 with no shared stops, always including the cheapest.
- * `notice` is set when the time window had to be dropped.
+ * Plans from the catalog that pass every hard rule: an activity then a food stop (nearby pairs first), else single
+ * stops. Picks up to 3 with no shared stops, always including the cheapest, then honorRequests() anchors them on the
+ * group's requests. Deterministic without `rng`; with it (make-plan passes Math.random), ties are broken randomly so
+ * the same answers don't always get the same three plans. `notice` is set when the time window had to be dropped.
  */
-export function backupPlans(catalog: CatalogEntry[], needs: GroupNeeds): { plans: PlanRow[]; notice: string | null } {
-  const plans = backupPlansStrict(catalog, needs);
+export function backupPlans(
+  catalog: CatalogEntry[],
+  needs: GroupNeeds,
+  rng?: () => number,
+): { plans: PlanRow[]; notice: string | null } {
+  const plans = backupPlansStrict(catalog, needs, rng);
   if (plans.length || (needs.windowFrom === null && needs.windowUntil === null)) return { plans, notice: null };
   // Nothing fits the clock window (e.g. "after 11pm"): drop only the window. Budget, food, transit and hard no's stay.
-  const relaxed = backupPlansStrict(catalog, { ...needs, windowFrom: null, windowUntil: null });
+  const loose = { ...needs, windowFrom: null, windowUntil: null };
+  const relaxed = backupPlansStrict(catalog, settleRequests(loose, catalog), rng);
   return { plans: relaxed, notice: relaxed.length ? WINDOW_RELAXED_NOTICE : null };
 }
 
-function backupPlansStrict(catalog: CatalogEntry[], needs: GroupNeeds): PlanRow[] {
+type Cand = { cs: CatalogEntry[]; starts: number[]; price: number; near: boolean };
+
+/** Every activity + food pair (and, with `singles`, every single stop) that passes the hard rules, best first. */
+function candidates(catalog: CatalogEntry[], needs: GroupNeeds, singles: boolean, rng?: () => number): Cand[] {
   const food = catalog.filter((c) => c.category === "food");
   const fun = catalog.filter((c) => c.category !== "food");
-  type Cand = { cs: CatalogEntry[]; starts: number[]; price: number; near: boolean };
   const cands: Cand[] = [];
   const tryAdd = (cs: CatalogEntry[]) => {
     const starts = schedule(cs, needs);
     if (!starts) return;
     if (violations(cs.map((c, i) => ({ c, start: starts[i] })), needs).length) return;
-    cands.push({ cs, starts, price: cs.reduce((s, c) => s + c.price_per_person_cents, 0), near: cs.length < 2 || sameArea(cs[0], cs[1]) });
+    cands.push({ cs, starts, price: cs.reduce((s, c) => s + c.price_per_person_cents, 0), near: cs.length === 2 && sameArea(cs[0], cs[1]) });
   };
   for (const a of fun) for (const b of food) tryAdd([a, b]);
-  if (cands.length < 3) for (const c of catalog) tryAdd([c]);
+  if (singles || cands.length < 3) for (const c of catalog) tryAdd([c]);
+  const pool = rng ? shuffled(cands, rng) : cands;
+  return pool.sort((x, y) =>
+    Number(y.near) - Number(x.near) || y.cs.length - x.cs.length || (rng ? 0 : x.price - y.price)
+  );
+}
 
-  cands.sort((x, y) => Number(y.near) - Number(x.near) || y.cs.length - x.cs.length || x.price - y.price);
+function backupPlansStrict(catalog: CatalogEntry[], needs: GroupNeeds, rng?: () => number): PlanRow[] {
+  const cands = candidates(catalog, needs, false, rng);
   const cheapest = [...cands].sort((x, y) => x.price - y.price)[0];
   const picked: Cand[] = [];
   for (const c of [cheapest, ...cands]) {
@@ -601,12 +672,101 @@ function backupPlansStrict(catalog: CatalogEntry[], needs: GroupNeeds): PlanRow[
     if (picked.length === 1 && cats.has(c.cs[0].category) && cands.some((o) => !cats.has(o.cs[0].category) && !o.cs.some((x) => used.has(x.id)))) continue;
     picked.push(c);
   }
-  return picked.map((c, i) =>
-    toRow(i, {
-      title: titleOf(c.cs),
-      summary: withGfCheck(summaryOf(c.cs), needs, c.cs),
-      items: c.cs.map((x, j) => ({ c: x, start_time: fmtTime(c.starts[j]), note: x.transit_note ?? "" })),
-      why: whyItFits(needs, c.cs),
-    }, needs)
-  );
+  return honorRequests(picked.map((c, i) => candRow(i, c, needs)), catalog, needs, rng);
+}
+
+function candRow(index: number, c: Cand, needs: GroupNeeds): PlanRow {
+  return toRow(index, {
+    title: titleOf(c.cs),
+    summary: withGfCheck(summaryOf(c.cs), needs, c.cs),
+    items: c.cs.map((x, j) => ({ c: x, start_time: fmtTime(c.starts[j]), note: x.transit_note ?? "" })),
+    why: whyItFits(needs, c.cs),
+  }, needs);
+}
+
+// ------------------------------------------------------------------ must-include requests
+const idsOf = (p: PlanRow) => p.items.map((i) => i.catalog_id);
+const sameStops = (a: PlanRow, b: PlanRow) => {
+  const x = [...idsOf(a)].sort().join("|");
+  return x === [...idsOf(b)].sort().join("|");
+};
+/** Requests a plan satisfies (by key). */
+const keysIn = (p: PlanRow, needs: GroupNeeds) =>
+  needs.requests.filter((r) => p.items.some((i) => r.ids.includes(i.catalog_id))).map((r) => r.key);
+
+/** Which requests the plan list still misses. Solo: every plan must be anchored too (reported as "plan:N"). */
+export function unmetRequests(plans: PlanRow[], needs: GroupNeeds): string[] {
+  const out = needs.requests.filter((r) => !plans.some((p) => keysIn(p, needs).includes(r.key))).map((r) => r.key);
+  if (needs.partySize === 1 && needs.requests.length) {
+    plans.forEach((p, i) => {
+      if (keysIn(p, needs).length === 0) out.push(`plan:${i}`);
+    });
+  }
+  return out;
+}
+
+/**
+ * Validates and repairs a plan list (Grok's or the backup's) so explicit requests are honored and plans differ:
+ * - drops plans with exactly the same stops as an earlier one;
+ * - each request missing from every plan replaces a plan that no other request depends on (or fills an empty slot)
+ *   with a server-built plan anchored on it;
+ * - solo: every plan that isn't anchored on a request is replaced by an anchored one (a different matching place and
+ *   different other stops each time), as long as the catalog has one; if it runs out, the plan stays as is;
+ * - tops the list up to 3 with non-overlapping backup plans when fewer survived.
+ * Replacement plans pass every hard rule (they come from the same candidate builder as the backup plans).
+ */
+export function honorRequests(plans: PlanRow[], catalog: CatalogEntry[], needs: GroupNeeds, rng?: () => number): PlanRow[] {
+  const out: PlanRow[] = [];
+  for (const p of plans) if (!out.some((q) => sameStops(p, q))) out.push(p);
+
+  const cands = candidates(catalog, needs, true, rng);
+  /** Best candidate (as a row) that shares no stop with the other plans and doesn't reuse a request venue. */
+  const pick = (ok: (c: Cand) => boolean, others: PlanRow[]): PlanRow | null => {
+    const used = new Set(others.flatMap(idsOf));
+    const anchorUsed = (c: Cand) => c.cs.some((x) => needs.requests.some((r) => r.ids.includes(x.id)) && used.has(x.id));
+    const fresh = cands.filter((c) => ok(c) && !c.cs.some((x) => used.has(x.id)) && !anchorUsed(c));
+    if (!fresh.length) return null;
+    // With rng, pick among the few best so repeated runs on the same answers don't return the same plans.
+    return candRow(0, fresh[rng ? Math.floor(rng() * Math.min(3, fresh.length)) : 0], needs);
+  };
+  const anchoredOn = (keys: string[]) => (c: Cand) =>
+    c.cs.some((x) => needs.requests.some((r) => keys.includes(r.key) && r.ids.includes(x.id)));
+
+  // Groups (and solo): every request shows up in at least one plan.
+  for (const r of needs.requests) {
+    if (out.some((p) => keysIn(p, needs).includes(r.key))) continue;
+    // A slot to use: an empty one, else a plan whose requests are all covered by another plan (unanchored first, last first).
+    const expendable = (i: number) =>
+      keysIn(out[i], needs).every((k) => out.some((q, j) => j !== i && keysIn(q, needs).includes(k)));
+    let slot = out.length < 3 ? out.length : -1;
+    if (slot === -1) {
+      const order = [...out.keys()].reverse();
+      slot = order.find((i) => keysIn(out[i], needs).length === 0) ?? order.find(expendable) ?? -1;
+    }
+    if (slot === -1) continue;
+    const row = pick(anchoredOn([r.key]), out.filter((_, j) => j !== slot));
+    if (row) out[slot] = row;
+  }
+
+  // Solo: anchor every plan, spreading the requests.
+  if (needs.partySize === 1 && needs.requests.length) {
+    for (let i = 0; i < 3; i++) {
+      if (i < out.length && keysIn(out[i], needs).length) continue;
+      const others = out.filter((_, j) => j !== i);
+      const covered = new Set(others.flatMap((p) => keysIn(p, needs)));
+      const keys = needs.requests.map((r) => r.key);
+      const row = pick(anchoredOn(keys.filter((k) => !covered.has(k))), others) ?? pick(anchoredOn(keys), others);
+      if (!row) continue;
+      if (i < out.length) out[i] = row;
+      else out.push(row);
+    }
+  }
+
+  // Top up to 3 distinct plans.
+  while (out.length < 3) {
+    const row = pick(() => true, out);
+    if (!row) break;
+    out.push(row);
+  }
+  return out.map((p, i) => ({ ...p, option_index: i }));
 }
