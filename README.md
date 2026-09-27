@@ -35,9 +35,9 @@ src/                     React app
   lib/payments.ts        pay-function calls + simulated payments fallback (no Stripe; see "Simulated payments")
   lib/fallback.ts        saved demo plans, used only if the make-plan call fails
 supabase/
-  functions/             make-plan, pay, recap-image + _shared (logic, tests, generated catalog/schema/prompt)
+  functions/             make-plan, pay, recap-image, parse-prefs + _shared (logic, tests, generated catalog/schema/prompt)
   migrations/            20260926000001_schema.sql (kit schema.sql), 20260926000002_messages.sql (group chat)
-  config.toml            verify_jwt = false for the three functions
+  config.toml            verify_jwt = false for every function
 data/                    atlanta-activities.json (catalog; prices are approximate demo data)
 prompts/                 make-plan.md (Grok system prompt, between PROMPT markers)
 schema/                  plan.schema.json (strict Grok output schema)
@@ -83,10 +83,15 @@ npx supabase secrets set GROK_API_KEY=xai-... STRIPE_SECRET_KEY=sk_test_...
 npx supabase functions deploy make-plan   --no-verify-jwt
 npx supabase functions deploy pay         --no-verify-jwt
 npx supabase functions deploy recap-image --no-verify-jwt   # optional
+npx supabase functions deploy parse-prefs --no-verify-jwt
 # No Docker? add --use-api
 ```
 
 `pay` refuses non-test Stripe keys. Without `STRIPE_SECRET_KEY` or a deployed `pay`, the app falls back to simulated payments (below). `SUPABASE_URL` and the service keys are injected automatically; don't set anything that starts with `SUPABASE_`. `--no-verify-jwt` is needed because `sb_publishable_` keys aren't JWTs (also set in `supabase/config.toml`); the functions check for the project's publishable key instead. That check is not auth, which is fine for a demo.
+
+### parse-prefs (voice answers -> questionnaire)
+
+`POST /functions/v1/parse-prefs` with `{ transcript: string, current?: Partial<Preferences> }` returns `{ preferences: Partial<Preferences>, heard: string }`, with only the fields the person mentioned. `Preferences` lives in `supabase/functions/_shared/preferences.ts` (`budget` in max $ per person, `transport` one of `car | marta | rideshare | walk`, `freeFrom`/`freeUntil` as 24h `HH:MM`, plus `food`, `hardNos`, `other`). It uses the same `GROK_API_KEY` / `GROK_MODEL` secrets as make-plan; without a key, or if Grok fails, it returns a basic regex parse (dollar amount, transport and diet keywords, full transcript in `other`) instead of an error. Empty transcripts get a 400; transcripts are cut to 2000 chars. Client: `parsePrefs(transcript, current?)` in `src/lib/parsePrefs.ts`. Deploy: `npx supabase functions deploy parse-prefs --no-verify-jwt`.
 
 Local function checks (Deno 2):
 
