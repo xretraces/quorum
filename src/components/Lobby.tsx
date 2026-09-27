@@ -4,7 +4,8 @@
 // the creator always keeps the QR code at the top.
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
-import { useT } from "../i18n/hooks";
+import { iso } from "../i18n/bidi";
+import { useT, useTNodes } from "../i18n/hooks";
 import { avatarColor, initials } from "../lib/booking";
 import { copyText, inviteUrl as inviteUrlFor } from "../lib/invite";
 import type { Group, Member } from "../lib/supabase";
@@ -23,6 +24,7 @@ type Props = {
 
 export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswers }: Props) {
   const t = useT();
+  const tNodes = useTNodes();
   const [note, setNote] = useState<string | null>(null);
   const inviteUrl = inviteUrlFor(group.invite_code); // always the live site, even from localhost
   const ready = members.filter((m) => m.prefs_ready).length;
@@ -153,7 +155,7 @@ export function Lobby({ group, members, me, busy, saved, onAskGrok, onOpenAnswer
       ) : (
         me && (
           <p className="text-center text-sm text-gray-500">
-            {t(allReady ? "lobby.waitingAllReady" : "lobby.waiting", { name: members.find((m) => m.is_organizer)?.display_name ?? t("common.theCreator") })}
+            {tNodes(allReady ? "lobby.waitingAllReady" : "lobby.waiting", { name: iso(members.find((m) => m.is_organizer)?.display_name ?? t("common.theCreator")) })}
           </p>
         )
       )}

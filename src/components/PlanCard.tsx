@@ -3,7 +3,8 @@
 import type { Member, Plan } from "../lib/supabase";
 import { usd } from "../lib/supabase";
 import { localStart } from "../i18n/format";
-import { useLanguage, useT } from "../i18n/hooks";
+import { isoList } from "../i18n/bidi";
+import { useLanguage, useT, useTNodes } from "../i18n/hooks";
 import { usePlanTranslation } from "../i18n/usePlanTranslation";
 import { DemoPlanPill, GrokSays } from "./Grok";
 import { VenuePhotos } from "./VenuePhotos";
@@ -23,6 +24,7 @@ type Props = {
 
 export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote, canVote, busy, onVote, onPick }: Props) {
   const t = useT();
+  const tNodes = useTNodes();
   const { lang } = useLanguage();
   const { plan, pending } = usePlanTranslation(original);
   const shimmer = pending ? "shimmer-text" : "";
@@ -80,7 +82,7 @@ export function PlanCard({ plan: original, labels, voters, memberCount, isMyVote
           {voters.length}/{memberCount}
         </span>
       </div>
-      {voters.length > 0 && <p className="px-1 text-xs text-gray-500">{t("plan.votersIn", { names: voters.map((v) => v.display_name).join(", ") })}</p>}
+      {voters.length > 0 && <p className="px-1 text-xs text-gray-500">{tNodes("plan.votersIn", { names: isoList(voters.map((v) => v.display_name), t("common.listSep")) })}</p>}
       {onPick && (
         <button
           disabled={busy}

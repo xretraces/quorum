@@ -1,7 +1,8 @@
 // src/components/JoinGroup.tsx: a friend scans the QR / opens /join/:inviteCode and joins with a display name.
 // A new member lands on their private answers page (/g/:id/answers); a returning one goes to the lobby.
 import { useCallback, useEffect, useState } from "react";
-import { useT } from "../i18n/hooks";
+import { iso, isoText } from "../i18n/bidi";
+import { useT, useTNodes } from "../i18n/hooks";
 import { isClosed } from "../lib/invite";
 import { claimMember } from "../lib/prefs";
 import { QuorumHeader } from "./QuorumHeader";
@@ -11,6 +12,7 @@ type Load = "loading" | "ok" | "not-found" | "offline";
 
 export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoined: (groupId: string, fresh: boolean) => void }) {
   const t = useT();
+  const tNodes = useTNodes();
   const [group, setGroup] = useState<Group | null>(null);
   const [load, setLoad] = useState<Load>("loading");
   const [name, setName] = useState("");
@@ -46,7 +48,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
       if (error) {
         setErr(
           error.code === "23505"
-            ? t("join.duplicateName", { name: displayName })
+            ? t("join.duplicateName", { name: isoText(displayName) })
             : t("join.failed", { error: error.message }),
         );
         return;
@@ -90,7 +92,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
         </div>
         <div className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 text-center shadow-lg ring-1 ring-spring/20">
           <p className="font-logo text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
-          <h1 className="text-xl font-bold">{t("join.closedTitle", { group: group.name })}</h1>
+          <h1 className="text-xl font-bold">{tNodes("join.closedTitle", { group: iso(group.name) })}</h1>
           <p className="text-sm text-gray-600">{t("join.closedBody")}</p>
           <button onClick={() => onJoined(group.id, false)} className="w-full rounded-xl bg-navy p-3 font-semibold text-white hover:brightness-95">
             {t("join.seePlan")}
@@ -108,7 +110,7 @@ export function JoinGroup({ inviteCode, onJoined }: { inviteCode: string; onJoin
       </div>
       <form onSubmit={join} className="relative z-10 w-full max-w-md space-y-4 rounded-3xl bg-white/90 p-6 shadow-lg ring-1 ring-spring/20">
         <p className="font-logo text-center text-2xl font-semibold tracking-tight text-spring-deep lowercase">quorum</p>
-        <h1 className="text-xl font-bold text-gray-900">{t("join.title", { group: group.name })}</h1>
+        <h1 className="text-xl font-bold text-gray-900">{tNodes("join.title", { group: iso(group.name) })}</h1>
         <input
           className="w-full rounded-lg border border-gray-300 p-3 text-base focus:border-spring focus:outline-none focus:ring-2 focus:ring-spring/40"
           value={name}
