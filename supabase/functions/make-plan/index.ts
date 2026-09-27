@@ -5,7 +5,7 @@
 // window, opening hours) and drops failures. If Grok is unavailable or nothing it proposed survives, deterministic backup
 // plans are built from the same answers (model "backup"). Replaces the group's plans and resets votes.
 // Grok gets at most GROK_BUDGET_MS in total (first attempt capped at GROK_FIRST_ATTEMPT_MS, the validation retry
-// only gets what is left), so a slow Grok falls back to backup plans at ~45s instead of hitting the Edge
+// only gets what is left), so a slow Grok falls back to backup plans at ~110s instead of hitting the Edge
 // Function wall-clock limit. The response carries `notice` when the backup plans had to ignore the free-time window.
 // Nothing written or returned names a member or reveals one person's answers.
 // Secrets: GROK_API_KEY (or XAI_API_KEY), optional GROK_MODEL.
@@ -31,8 +31,8 @@ import type { Preferences } from "../_shared/preferences.ts";
 
 const XAI_URL = "https://api.x.ai/v1/chat/completions";
 const DEFAULT_MODEL = "grok-4.7"; // override with the GROK_MODEL secret
-const GROK_FIRST_ATTEMPT_MS = 40_000;
-const GROK_BUDGET_MS = 45_000; // total across both attempts
+const GROK_FIRST_ATTEMPT_MS = 75_000;
+const GROK_BUDGET_MS = 110_000; // total across both attempts; leaves room under the 150s wall-clock limit
 const GROK_MIN_RETRY_MS = 5_000; // skip the retry if less than this is left
 const catalog = CATALOG_FILE.activities as unknown as CatalogEntry[];
 const requestSchema = schemaForRequest(PREFS_PLAN_SCHEMA as unknown as Record<string, unknown>, catalog.map((c) => c.id));
