@@ -51,6 +51,48 @@ export function nextNoiseFloor(floor: number | null, rms: number): number {
   return floor + (rms - floor) * (rms < floor ? FLOOR_FALL : FLOOR_RISE);
 }
 
+/**
+ * Cold-start fix. A freshly opened mic (the first take of a page load especially) delivers a few hundred ms of
+ * digital silence or an auto-gain ramp before real room sound. Seeding the floor from that first frame put it
+ * near 0, so ordinary room noise counted as "speech", the take never auto-stopped (or stopped before they
+ * talked), and it took ~10s for the floor to catch up. Now: dead frames are ignored, the first CALIBRATION_MS
+ * of live audio sets the floor from a low percentile (so talking right away doesn't inflate it), and only
+ * clearly loud audio counts as speech while calibrating.
+ */
+export const DEAD_FRAME_RMS = 0.002;
+export const CALIBRATION_MS = 500;
+const CALIBRATION_PERCENTILE = 0.2;
+
+export type LevelTracker = { floor: number | null; startedAt: number | null; calib: number[]; calibrated: boolean };
+
+/** `seedFloor`: the last take's floor, used only until this take's calibration finishes. */
+export function createLevelTracker(seedFloor: number | null = null): LevelTracker {
+  return { floor: seedFloor, startedAt: null, calib: [], calibrated: false };
+}
+
+function lowPercentile(xs: number[], q: number): number {
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.floor(q * s.length))];
+}
+
+/** Feed one RMS reading. Returns true if this frame is speech. Mutates the tracker. */
+export function trackLevel(t: LevelTracker, rms: number, now: number): boolean {
+  if (rms < DEAD_FRAME_RMS) return false; // mic not live yet (or muted): never calibrate on it
+  if (t.startedAt === null) t.startedAt = now;
+  if (!t.calibrated) {
+    if (now - t.startedAt < CALIBRATION_MS) {
+      t.calib.push(rms);
+      return rms >= Math.max(SPEECH_RMS_THRESHOLD * 2, (t.floor ?? 0) * SPEECH_FLOOR_RATIO);
+    }
+    t.calibrated = true;
+    if (t.calib.length) t.floor = lowPercentile(t.calib, CALIBRATION_PERCENTILE);
+    t.calib = [];
+  }
+  const speaking = t.floor !== null && isSpeechLevel(rms, t.floor);
+  t.floor = nextNoiseFloor(t.floor, rms);
+  return speaking;
+}
+
 export function isSpeechLevel(rms: number, noiseFloor = 0, threshold = SPEECH_RMS_THRESHOLD): boolean {
   return rms >= Math.max(threshold, noiseFloor * SPEECH_FLOOR_RATIO);
 }

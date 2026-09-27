@@ -4,6 +4,7 @@
 // Answers are saved privately (lib/prefs.ts); the group only sees a "ready" checkmark.
 import { type ReactNode, type Ref, useCallback, useEffect, useImperativeHandle, useState } from "react";
 import { EMPTY_PREFS, loadMyPrefs, mergePrefs, type Preferences, saveMyPrefs } from "../lib/prefs";
+import { VoiceFill } from "./VoiceFill";
 
 export type QuestionnaireHandle = {
   applyPreferences: (partial: Partial<Preferences>) => void;
@@ -66,6 +67,7 @@ export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
 
   return (
     <form onSubmit={save} className="space-y-4">
+      <VoiceFill current={prefs} apply={applyPreferences} />
       {mic && <div>{mic}</div>}
       <p className="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white">🔒 Only Grok sees this. Your group just sees that you're ready.</p>
       <p className="text-sm text-gray-500">Leave any field blank for no preference.</p>

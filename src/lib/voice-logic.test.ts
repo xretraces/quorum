@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  CALIBRATION_MS,
   chooseTakeOutcome,
+  createLevelTracker,
+  trackLevel,
   isInfraTranscribeFailure,
   isPhone,
   isSpeechLevel,
@@ -133,4 +136,27 @@ test("only infra transcribe failures fall back to browser STT", () => {
   assert.equal(isInfraTranscribeFailure(true, 502), true);
   assert.equal(isInfraTranscribeFailure(true, 400), false);
   assert.equal(isInfraTranscribeFailure(true, 422), false);
+});
+
+test("cold start: dead frames from a warming-up mic don't zero the floor, so room noise isn't speech", () => {
+  const t = createLevelTracker();
+  let now = 0;
+  let spoke = false;
+  for (let i = 0; i < 5; i++, now += 100) spoke ||= trackLevel(t, 0, now); // 500ms of digital silence
+  for (let i = 0; i < 30; i++, now += 100) spoke ||= trackLevel(t, 0.04, now); // steady room hum above 0.03
+  assert.equal(spoke, false);
+  assert.ok(t.floor !== null && t.floor > 0.03);
+  assert.equal(trackLevel(t, 0.25, now), true); // real speech still detected
+});
+
+test("cold start: talking right away still counts, and doesn't inflate the calibrated floor", () => {
+  const t = createLevelTracker();
+  let now = 0;
+  const heard: boolean[] = [];
+  const levels = [0.01, 0.2, 0.25, 0.01, 0.2, 0.01];
+  for (const l of levels) { heard.push(trackLevel(t, l, now)); now += 100; }
+  assert.equal(heard[1], true);
+  assert.ok(now >= CALIBRATION_MS);
+  assert.ok((t.floor ?? 1) < 0.03);
+  assert.equal(trackLevel(t, 0.01, now + 100), false);
 });

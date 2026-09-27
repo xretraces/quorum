@@ -8,11 +8,10 @@ import { invoke, InvokeError } from "./supabase";
 import {
   isInfraTranscribeFailure,
   isPhone,
-  isSpeechLevel,
+  createLevelTracker,
   joinTranscriptParts,
   MAX_RECORD_MS,
   mimeToFilename,
-  nextNoiseFloor,
   pickRecorderMime,
   RECORDER_MIME_CANDIDATES,
   rmsFromTimeDomain,
@@ -20,6 +19,7 @@ import {
   shouldRestartRecognition,
   shouldRunParallelStt,
   SILENCE_MS,
+  trackLevel,
 } from "./voice-logic";
 
 export type VoiceSource = "grok" | "browser";
@@ -75,26 +75,56 @@ function stopStream(stream: MediaStream | null): void {
   for (const t of stream.getTracks()) t.stop();
 }
 
+/** Room noise floor from the previous take: seeds the next take until its own calibration is done. */
+let lastTakeFloor: number | null = null;
+
 /** Record until Stop, ~2.5s of post-speech silence, or MAX_RECORD_MS. Always releases the mic + AudioContext. */
 export async function recordAudio(opts: VoiceCaptureOpts): Promise<{ blob: Blob; mime: string }> {
   const maxMs = opts.maxMs ?? MAX_RECORD_MS;
   const silenceMs = opts.silenceMs ?? SILENCE_MS;
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true },
-  });
+  // Create/resume the AudioContext synchronously inside the tap, before the permission prompt. Created after
+  // `await getUserMedia` it has lost the user gesture, so iOS Safari leaves it suspended (all-silent analyser)
+  // on the first take. Part of the cold-start fix; see createLevelTracker.
+  const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  let ctx: AudioContext | null = null;
+  try {
+    ctx = AudioCtx ? new AudioCtx() : null;
+    void ctx?.resume().catch(() => undefined);
+  } catch {
+    ctx = null;
+  }
+  let stream: MediaStream;
+  let rec: MediaRecorder;
   const mime = pickSupportedRecorderMime();
-  const rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true },
+    });
+  } catch (e) {
+    await closeAudioContext(ctx);
+    throw e;
+  }
+  try {
+    rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  } catch {
+    // Some Safari builds reject an explicit mimeType they claim to support; let the browser pick.
+    try {
+      rec = new MediaRecorder(stream);
+    } catch (e) {
+      stopStream(stream);
+      await closeAudioContext(ctx);
+      throw e;
+    }
+  }
   const chunks: BlobPart[] = [];
   rec.ondataavailable = (e) => {
     if (e.data.size) chunks.push(e.data);
   };
 
-  const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  let ctx: AudioContext | null = null;
   let poll = 0;
   let heardSpeech = false;
   let lastSpeechAt: number | null = null;
-  let noiseFloor: number | null = null;
+  const levels = createLevelTracker(lastTakeFloor);
 
   const stopped = new Promise<Blob>((resolve, reject) => {
     rec.onstop = () => resolve(new Blob(chunks, { type: rec.mimeType || mime || RECORDER_MIME_CANDIDATES[0] }));
@@ -106,8 +136,7 @@ export async function recordAudio(opts: VoiceCaptureOpts): Promise<{ blob: Blob;
   };
 
   try {
-    if (AudioCtx) {
-      ctx = new AudioCtx();
+    if (ctx) {
       await ctx.resume().catch(() => undefined);
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
@@ -123,8 +152,8 @@ export async function recordAudio(opts: VoiceCaptureOpts): Promise<{ blob: Blob;
         analyser.getByteTimeDomainData(buf);
         const now = Date.now();
         const rms = rmsFromTimeDomain(buf);
-        const speaking = noiseFloor !== null && isSpeechLevel(rms, noiseFloor);
-        noiseFloor = nextNoiseFloor(noiseFloor, rms);
+        const speaking = trackLevel(levels, rms, now);
+        if (levels.calibrated) lastTakeFloor = levels.floor;
         if (speaking) {
           heardSpeech = true;
           lastSpeechAt = now;
@@ -199,7 +228,7 @@ export function browserDictate(opts: VoiceCaptureOpts): Promise<string> {
     const maxMs = opts.maxMs ?? MAX_RECORD_MS;
     const silenceMs = opts.silenceMs ?? SILENCE_MS;
     const rec = new SR();
-    rec.lang = "en-US";
+    rec.lang = navigator.language || "en-US";
     rec.continuous = true;
     rec.interimResults = true;
 
