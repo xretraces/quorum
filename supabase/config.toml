@@ -16,3 +16,6 @@ verify_jwt = false
 
 [functions.parse-prefs]
 verify_jwt = false
+
+[functions.translate-plan]
+verify_jwt = false

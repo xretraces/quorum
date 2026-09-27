@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { claimMember } from "../lib/prefs";
 import { setMyMemberId, supabase } from "../lib/supabase";
+import { useT } from "../i18n/hooks";
 import { YourGroups } from "./YourGroups";
 
 const input = "w-full rounded-lg border border-gray-300 p-3 focus:border-transparent focus:ring-2 focus:ring-indigo-500";
@@ -10,7 +11,9 @@ const input = "w-full rounded-lg border border-gray-300 p-3 focus:border-transpa
 type Props = { onCreated: (groupId: string) => void; onJoinCode: (code: string) => void; onOpen: (groupId: string) => void };
 
 export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
-  const [groupName, setGroupName] = useState("Saturday hang");
+  const t = useT();
+  const [groupNameInput, setGroupName] = useState<string | null>(null); // null = the (translated) default
+  const groupName = groupNameInput ?? t("landing.defaultGroupName");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -50,26 +53,26 @@ export function CreateGroup({ onCreated, onJoinCode, onOpen }: Props) {
       <div className="w-full max-w-md space-y-4">
         <div className="text-center">
           <h1 className="text-4xl font-bold text-indigo-600">Quorum</h1>
-          <p className="mt-2 text-gray-600">Everyone answers privately. Grok finds the plan that works for all of you.</p>
+          <p className="mt-2 text-gray-600">{t("landing.tagline")}</p>
         </div>
 
         <YourGroups onOpen={onOpen} />
 
         <form onSubmit={create} className="space-y-3 rounded-2xl bg-white p-6 shadow-lg">
-          <h2 className="text-xl font-bold">Create Group</h2>
-          <input className={input} value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name" required />
-          <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" required />
+          <h2 className="text-xl font-bold">{t("landing.createTitle")}</h2>
+          <input className={input} value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder={t("landing.groupNamePlaceholder")} required />
+          <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder={t("common.yourName")} required />
           <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white transition-colors hover:bg-indigo-700 disabled:opacity-50">
-            {busy ? "Creating…" : "Create Group"}
+            {busy ? t("landing.creating") : t("landing.createButton")}
           </button>
           {err && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{err}</p>}
         </form>
 
         <form onSubmit={join} className="space-y-3 rounded-2xl bg-white p-6 shadow-lg">
-          <h2 className="text-xl font-bold">Join Group</h2>
-          <input className={input} value={code} onChange={(e) => setCode(e.target.value)} placeholder="Invite code or link" required />
+          <h2 className="text-xl font-bold">{t("landing.joinTitle")}</h2>
+          <input className={input} value={code} onChange={(e) => setCode(e.target.value)} placeholder={t("landing.codePlaceholder")} required />
           <button className="w-full rounded-xl border-2 border-indigo-600 p-3 font-semibold text-indigo-700 transition-colors hover:bg-indigo-50">
-            Join Group
+            {t("landing.joinButton")}
           </button>
         </form>
       </div>

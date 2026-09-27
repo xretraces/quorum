@@ -3,6 +3,7 @@
 // fields it gets (see mergePrefs) and never wipes typed ones. `mic` renders in the empty slot at the top.
 // Answers are saved privately (lib/prefs.ts); the group only sees a "ready" checkmark.
 import { type ReactNode, type Ref, useCallback, useEffect, useImperativeHandle, useState } from "react";
+import { useT } from "../i18n/hooks";
 import { EMPTY_PREFS, loadMyPrefs, mergePrefs, type Preferences, saveMyPrefs } from "../lib/prefs";
 import { VoiceFill } from "./VoiceFill";
 
@@ -22,6 +23,7 @@ const input = "mt-1 w-full rounded-lg border border-gray-300 p-3 text-base focus
 const label = "block text-sm font-medium text-gray-800";
 
 export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
+  const t = useT();
   const [prefs, setPrefs] = useState<Preferences>(EMPTY_PREFS);
   const [budgetText, setBudgetText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,7 +47,7 @@ export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     const b = budgetText.trim() === "" ? null : Number(budgetText.replace(/[$,\s]/g, ""));
-    if (b !== null && (!Number.isFinite(b) || b < 0)) return setErr("Budget must be a dollar amount, like 30.");
+    if (b !== null && (!Number.isFinite(b) || b < 0)) return setErr(t("q.budgetInvalid"));
     setBusy(true);
     setErr(null);
     try {
@@ -69,37 +71,37 @@ export function Questionnaire({ memberId, mic, onSaved, ref }: Props) {
     <form onSubmit={save} className="space-y-4">
       <VoiceFill current={prefs} apply={applyPreferences} />
       {mic && <div>{mic}</div>}
-      <p className="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white">🔒 Only Grok sees this. Your group just sees that you're ready.</p>
-      <p className="text-sm text-gray-500">Leave any field blank for no preference.</p>
+      <p className="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white">{t("q.private")}</p>
+      <p className="text-sm text-gray-500">{t("q.blankHint")}</p>
 
       <label className={label}>
-        Budget (max $ per person)
+        {t("q.budget")}
         <input
           className={input}
           inputMode="decimal"
-          placeholder="No preference"
+          placeholder={t("q.noPreference")}
           value={budgetText}
           onChange={(e) => setBudgetText(e.target.value)}
         />
       </label>
 
       <label className={label}>
-        Dietary
-        <input className={input} placeholder="No preference" value={prefs.dietary} onChange={(e) => set("dietary", e.target.value)} />
+        {t("q.dietary")}
+        <input className={input} placeholder={t("q.noPreference")} value={prefs.dietary} onChange={(e) => set("dietary", e.target.value)} />
       </label>
 
       <label className={label}>
-        Availability
-        <input className={input} placeholder="No preference" value={prefs.availability} onChange={(e) => set("availability", e.target.value)} />
+        {t("q.availability")}
+        <input className={input} placeholder={t("q.noPreference")} value={prefs.availability} onChange={(e) => set("availability", e.target.value)} />
       </label>
 
       <label className={label}>
-        Other
-        <textarea className={`${input} h-20 resize-none`} maxLength={1500} placeholder="No preference" value={prefs.other} onChange={(e) => set("other", e.target.value)} />
+        {t("q.other")}
+        <textarea className={`${input} h-20 resize-none`} maxLength={1500} placeholder={t("q.noPreference")} value={prefs.other} onChange={(e) => set("other", e.target.value)} />
       </label>
 
       <button disabled={busy} className="w-full rounded-xl bg-indigo-600 p-3 font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
-        {busy ? "Saving…" : "I'm ready"}
+        {busy ? t("q.saving") : t("q.submit")}
       </button>
       {err && <p className="rounded bg-red-50 p-2 text-sm text-red-600">{err}</p>}
     </form>

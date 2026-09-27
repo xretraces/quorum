@@ -2,6 +2,7 @@
 // their answers), this phone's private questionnaire, and the creator's "Ask Grok" button.
 import { QRCodeSVG } from "qrcode.react";
 import { useState } from "react";
+import { useT } from "../i18n/hooks";
 import { avatarColor, initials } from "../lib/booking";
 import { copyText, inviteUrl as inviteUrlFor } from "../lib/invite";
 import type { Group, Member } from "../lib/supabase";
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const inviteUrl = inviteUrlFor(group.invite_code); // always the live site, even from localhost
@@ -31,13 +33,13 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
     setTimeout(() => setNote(null), 2000);
   };
   async function copy() {
-    flash((await copyText(inviteUrl)) ? "Copied!" : "Couldn't copy. Long-press the link instead.");
+    flash((await copyText(inviteUrl)) ? t("lobby.copied") : t("lobby.copyFailed"));
   }
   async function share() {
     // Desktop browsers often have no navigator.share: fall back to copying the link.
     if (navigator.share) {
       try {
-        await navigator.share({ title: `Join ${group.name} on Quorum`, text: `Join "${group.name}" on Quorum`, url: inviteUrl });
+        await navigator.share({ title: t("lobby.shareTitle", { group: group.name }), text: t("lobby.shareText", { group: group.name }), url: inviteUrl });
         return;
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
@@ -49,18 +51,18 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
   return (
     <div className="space-y-4">
       <section className="rounded-2xl bg-white p-4 text-center shadow-md">
-        <p className="text-sm font-semibold text-gray-700">Scan to join</p>
-        <p className="text-xs text-gray-500">No app needed. Just point your phone camera here.</p>
+        <p className="text-sm font-semibold text-gray-700">{t("lobby.scanToJoin")}</p>
+        <p className="text-xs text-gray-500">{t("lobby.noApp")}</p>
         <div className="mx-auto mt-3 w-full max-w-[280px] rounded-2xl bg-white p-3 ring-1 ring-gray-200">
-          <QRCodeSVG value={inviteUrl} size={512} marginSize={4} bgColor="#ffffff" fgColor="#000000" className="h-auto w-full" title={`Invite link for ${group.name}`} />
+          <QRCodeSVG value={inviteUrl} size={512} marginSize={4} bgColor="#ffffff" fgColor="#000000" className="h-auto w-full" title={t("lobby.qrTitle", { group: group.name })} />
         </div>
         <p className="mt-2 break-all font-mono text-xs text-gray-500">{inviteUrl}</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button onClick={copy} className="rounded-xl border border-gray-300 p-3 font-semibold text-gray-800 hover:bg-gray-50">
-            Copy link
+            {t("lobby.copyLink")}
           </button>
           <button onClick={share} className="rounded-xl bg-indigo-600 p-3 font-semibold text-white hover:bg-indigo-700">
-            Share
+            {t("common.share")}
           </button>
         </div>
         {note && <p role="status" className="mt-2 text-sm text-emerald-700">{note}</p>}
@@ -68,8 +70,8 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
 
       <section className="rounded-2xl bg-white p-4 shadow-md">
         <div className="mb-2 flex items-baseline justify-between">
-          <h2 className="font-semibold text-gray-900">Who's in ({members.length})</h2>
-          <span className="text-xs text-gray-500">{ready} of {members.length} ready</span>
+          <h2 className="font-semibold text-gray-900">{t("lobby.whosIn", { count: members.length })}</h2>
+          <span className="text-xs text-gray-500">{t("lobby.readyCount", { ready, total: members.length })}</span>
         </div>
         <ul className="divide-y divide-gray-100">
           {members.map((m) => (
@@ -78,17 +80,17 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
                 {initials(m.display_name)}
               </span>
               <span className="min-w-0 flex-1 truncate font-medium text-gray-900">
-                {m.display_name}
-                {m.is_organizer && <span className="ml-1 text-xs font-normal text-gray-500">· creator</span>}
-                {m.id === me?.id && <span className="ml-1 text-xs font-normal text-gray-500">· you</span>}
+                <bdi>{m.display_name}</bdi>
+                {m.is_organizer && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.creatorTag")}</span>}
+                {m.id === me?.id && <span className="ms-1 text-xs font-normal text-gray-500">{t("lobby.youTag")}</span>}
               </span>
               {m.prefs_ready ? (
                 <span className="flex items-center gap-1 text-sm font-semibold text-emerald-600">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-xs text-white motion-safe:animate-pop">✓</span>
-                  Ready
+                  {t("lobby.ready")}
                 </span>
               ) : (
-                <span className="text-sm text-gray-400">Answering…</span>
+                <span className="text-sm text-gray-400">{t("lobby.answering")}</span>
               )}
             </li>
           ))}
@@ -99,7 +101,7 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
         <section className="rounded-2xl bg-white p-4 shadow-md">
           {showForm ? (
             <>
-              <h2 className="mb-3 font-semibold text-gray-900">Your answers</h2>
+              <h2 className="mb-3 font-semibold text-gray-900">{t("lobby.yourAnswers")}</h2>
               <Questionnaire
                 memberId={me.id}
                 onSaved={() => {
@@ -110,8 +112,8 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
             </>
           ) : (
             <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-gray-700">✓ Your answers are in. Only Grok sees them.</p>
-              <button onClick={() => setEditing(true)} className="shrink-0 text-sm font-semibold text-indigo-600">Edit</button>
+              <p className="text-sm text-gray-700">{t("lobby.answersIn")}</p>
+              <button onClick={() => setEditing(true)} className="shrink-0 text-sm font-semibold text-indigo-600">{t("lobby.edit")}</button>
             </div>
           )}
         </section>
@@ -123,10 +125,10 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
             <GrokAvatar size={28} />
             <p className="text-sm">
               {allReady
-                ? "Everyone's ready. Grok can plan now."
+                ? t("lobby.allReady")
                 : canForce
-                  ? `${ready} of ${members.length} are ready. You can wait, or plan it anyway.`
-                  : "Grok needs at least 2 people's answers."}
+                  ? t("lobby.canForce", { ready, total: members.length })
+                  : t("lobby.needTwo")}
             </p>
           </div>
           <button
@@ -134,13 +136,13 @@ export function Lobby({ group, members, me, busy, onAskGrok, onRefresh }: Props)
             onClick={onAskGrok}
             className="w-full rounded-xl bg-white p-3 font-semibold text-gray-900 disabled:opacity-40"
           >
-            {allReady ? "✨ Ask Grok" : "✨ Plan it anyway"}
+            {allReady ? t("lobby.askGrok") : t("lobby.planAnyway")}
           </button>
         </section>
       ) : (
         me && (
           <p className="text-center text-sm text-gray-500">
-            {allReady ? "Everyone's ready. " : ""}Waiting for {members.find((m) => m.is_organizer)?.display_name ?? "the creator"} to ask Grok.
+            {t(allReady ? "lobby.waitingAllReady" : "lobby.waiting", { name: members.find((m) => m.is_organizer)?.display_name ?? t("common.theCreator") })}
           </p>
         )
       )}
