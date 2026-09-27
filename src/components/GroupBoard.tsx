@@ -1,5 +1,6 @@
 // Group board: lobby (QR invite, live members + ready checks, "Fill out my answers") with the private questionnaire on its
-// own page (/g/:id/answers; saving returns to the lobby) -> the creator asks Grok
+// own page (/g/:id/answers) -> once a member's answers are in, a "Waiting on others" screen (no QR; "Invite more" reopens
+// the lobby) -> when the last member answers, their phone starts make-plan on its own (the creator can also start early)
 // (make-plan reads everyone's private answers server-side) with the shared "Grok is working" steps -> plan cards
 // with real venue photos and live "I'm in" votes -> once everyone has voted, the top plan wins (the creator
 // breaks ties) and every phone switches to "Your plan". Everything refetches on Realtime changes.
@@ -16,6 +17,7 @@ import { Lobby } from "./Lobby";
 import { PlanCard } from "./PlanCard";
 import { Questionnaire } from "./Questionnaire";
 import { QuorumHeader } from "./QuorumHeader";
+import { Waiting } from "./Waiting";
 
 export type Navigate = { replace?: boolean; state?: unknown };
 
@@ -67,6 +69,9 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
   const grokRun = [myRun, remoteRun].find((r) => r && r.startedAt !== dismissedRun) ?? null;
   const dismissGrokRun = useCallback(() => setDismissedRun(grokRun?.startedAt ?? null), [grokRun?.startedAt]);
   const decideSent = useRef<string | null>(null);
+  const [inviting, setInviting] = useState(false);
+  // Set when this phone saves answers: if that save made everyone ready, this phone (the last to answer) starts the plans.
+  const autoPlan = useRef(false);
 
   const load = useCallback(async () => {
     const [g, m, p] = await Promise.all([
@@ -98,6 +103,7 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
   const winner = plans.find((p) => p.id === group?.selected_plan_id) ?? null;
   const { voted, winner: leading, tied } = tally(plans, members);
   const stage = grokRun ? "grok" : winner ? "final" : plans.length ? "vote" : "lobby";
+  const allReady = members.length > 0 && members.every((m) => m.prefs_ready);
 
   const lobbyPath = `/g/${groupId}`;
   const openAnswers = () => navigate(`${lobbyPath}/answers`, { state: { fromLobby: true } });
@@ -219,6 +225,21 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
     return (i.data ?? []) as Plan[];
   }
 
+  // The last member to answer starts make-plan, so nobody has to press "Make the plan". Only the phone that just saved
+  // tries, after a short random delay; any run announced by another phone (or plans appearing) cancels it.
+  const askGrokRef = useRef(askGrok);
+  useEffect(() => {
+    askGrokRef.current = askGrok;
+  });
+  useEffect(() => {
+    if (!autoPlan.current || page !== "lobby" || stage !== "lobby" || busy || !allReady) return;
+    const id = window.setTimeout(() => {
+      autoPlan.current = false;
+      void askGrokRef.current();
+    }, 250 + Math.random() * 750);
+    return () => window.clearTimeout(id);
+  }, [page, stage, busy, allReady]);
+
   const home = (e: React.MouseEvent) => {
     e.preventDefault();
     onHome();
@@ -271,6 +292,8 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
                 </header>
               }
               onSaved={() => {
+                autoPlan.current = true;
+                setInviting(false);
                 setSavedNote(true);
                 void load();
                 backToLobby();
@@ -312,8 +335,21 @@ export function GroupBoard({ groupId, page, navigate, onHome }: Props) {
           </p>
         )}
 
-        {stage === "lobby" && (
-          <Lobby group={group} members={members} me={me} busy={!!busy} saved={savedNote} onAskGrok={askGrok} onOpenAnswers={openAnswers} />
+        {stage === "lobby" && me?.prefs_ready && !inviting && (
+          <Waiting members={members} me={me} busy={!!busy} saved={savedNote} onMakePlans={askGrok} onOpenAnswers={openAnswers} onInvite={() => setInviting(true)} />
+        )}
+
+        {stage === "lobby" && (!me?.prefs_ready || inviting) && (
+          <>
+            {inviting && (
+              <div className="mx-auto mb-6 w-full max-w-3xl">
+                <button onClick={() => setInviting(false)} className="text-sm font-semibold text-navy underline underline-offset-4">
+                  {t("waiting.doneInviting")}
+                </button>
+              </div>
+            )}
+            <Lobby group={group} members={members} me={me} busy={!!busy} saved={savedNote} onAskGrok={askGrok} onOpenAnswers={openAnswers} />
+          </>
         )}
 
         {grokRun && (
